@@ -418,7 +418,7 @@ Every task header has a **Model** line. The orchestrator dispatches each impleme
 
 **Interfaces:**
 - Produces:
-  - `default_dirs(platform: str, env: Mapping[str, str], home: Path) -> list[tuple[Path, str]]` — returns (dir, format). The folders are exactly the per-OS list in spec §5 "plugins: โฟลเดอร์ที่สแกน", plus the CLAP_PATH entries (split on `os.pathsep`). Windows legacy VST2 dirs (`%ProgramFiles%\VSTPlugins`, `%ProgramFiles%\Steinberg\VstPlugins`, `%CommonProgramFiles%\VST2`) are added with the format `"vst2"`, for warnings only.
+  - `default_dirs(platform: str, env: Mapping[str, str], home: Path) -> list[tuple[Path, str]]` — returns (dir, format). The folders are exactly the per-OS list in spec §5 "plugins: scanned folders", plus the CLAP_PATH entries (split on `os.pathsep`). Windows legacy VST2 dirs (`%ProgramFiles%\VSTPlugins`, `%ProgramFiles%\Steinberg\VstPlugins`, `%CommonProgramFiles%\VST2`) are added with the format `"vst2"`, for warnings only.
   - `scan(dirs: list[tuple[Path, str]]) -> dict` with:
     - `plugins`: `[{name, format, path, category}]` sorted by name.
     - `unsupported`: `[{name, format, path, reason}]`.
