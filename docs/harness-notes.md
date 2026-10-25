@@ -40,10 +40,11 @@ claude plugin validate .claude-plugin/plugin.json
 ```
 
 Both ended with `Validation passed`. The validator separately reported
-`README_MISSING` (a plugin directory submission refusal) and `ICON_MISSING`
+`README_MISSING` (at the time, a plugin directory submission refusal) and `ICON_MISSING`
 (a plugin directory warning). These do not fail its default validation profile.
-The directory submission profile, policy review, actual installation, and MCP
-execution were not tested. README publication work belongs to a later task.
+The directory submission profile, policy review, skills installation, and MCP
+execution were not tested. README is now present; rerun validation if directory
+submission is intended.
 An initial marketplace description warning was fixed before the final checks.
 
 `codex --version` returned `codex-cli 0.164.0`. A native parser probe used the
@@ -143,3 +144,17 @@ The required full-suite command was run once after the fixes:
 exit 0, no skips. Detailed RED/GREEN evidence is in the Task 9 workspace report.
 Windows handle behavior is tested natively; the POSIX branch is source-reviewed
 but has not been executed on a POSIX host in this session.
+
+## Task 19 real CLI smoke evidence
+
+On 2026-10-25, SoundCraft CLI 0.12.1 was exercised in three isolated headless sessions using the installed Windows executable. The recorded method was real import, instrument assignment, and bounce; `out/live-smoke-12e28s38/results.json` and the accompanying raw logs are the evidence. The CLI was not on PATH. The generated WAVs are ignored local artifacts and are not committed.
+
+| Case | Instrument/session result | WAV bytes | Duration | LUFS | Peak dBFS | True peak dBFS |
+|---|---|---:|---:|---:|---:|---:|
+| Setup | Initial session | 2,304,104 | 8.000 s | -22.982 | -13.136 | -13.125 |
+| Chords | Track “Pop Chords”, ID 1, `subtractive_synth` | 2,468,672 | 8.571 s | -22.733 | -13.602 | -13.601 |
+| Drums | Track “Pop Drums”, ID 1, `drum_synth` | 2,468,996 | 8.573 s | -27.256 | -7.266 | -7.077 |
+
+All three WAVs were nonzero in size, had finite measured peaks, and remained below 0 dBFS (no clipping). This is evidence for the real CLI's isolated import/instrument/bounce flow on this machine and version only. It does not test MCP transport, integration through a native agent harness, third-party hosting, listening quality, or cultural fidelity. Keep those explicitly untested. No software installation or harness configuration change was performed for this smoke run.
+
+The earlier Claude validator results and Codex parser probe above remain limited to the installed builds described there. They do not establish native Codex or Antigravity plugin coexistence or verified installation. The prior statement that actual installation was untested remains accurate for the skills/installer; the separate SoundCraft CLI smoke above does not change it. `README_MISSING` is resolved by adding this repository README. `ICON_MISSING` remains a directory-submission warning; no icon-readiness claim is made.
