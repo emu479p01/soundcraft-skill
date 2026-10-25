@@ -1,7 +1,7 @@
 # SoundCraft Skills — Design Spec
 
 - วันที่: 2026-10-25
-- สถานะ: รอรีวิว
+- สถานะ: รอรีวิว (Phase 1 ละเอียด, Phase 2–3 ระดับ roadmap)
 - โปรแกรมเป้าหมาย: [storytold/soundcraft](https://github.com/storytold/soundcraft) (Rust DAW, pre-alpha)
 
 ## 1. เป้าหมาย
@@ -21,8 +21,14 @@
 3. User ถามว่ามี plugin อะไร / ควรใช้อะไร แล้วได้คำตอบจากการสแกนเครื่องจริง และโหลด plugin เข้า track ได้
 4. ถ้า SoundCraft/MCP ใช้ไม่ได้ ยังได้ไฟล์ `.mid` ไปใช้ใน DAW อื่น
 5. ติดตั้งได้ทั้ง 3 harness จาก repo เดียว
+6. User ขอเสียง ("pad อุ่น ๆ", "808 ยาว") แล้วได้ `subtractive_synth` ที่ตั้งค่าแล้ว + บันทึกเป็น preset
+7. User ส่งไฟล์ MIDI / track ที่มีอยู่ แล้วได้ key, ชื่อคอร์ด, เลขโรมัน และคำอธิบาย
+8. ขอ "ลูกทุ่ง" / "หมอลำ" / "ป๊อปไทย" ใน chords/drums แล้วได้สำเนียงไทยที่ถูกต้อง
 
-**นอกขอบเขต v1:** bassline/melody, song-sketch (ทั้งเพลง), mix-assist, การดาวน์โหลด/รัน installer ของ plugin อัตโนมัติ
+**ทั้งหมดแบ่งทำเป็น 3 phase** (ดู §10 Roadmap) — spec นี้ลงรายละเอียด **Phase 1**;
+Phase 2–3 จะมี spec + plan ของตัวเองเมื่อ Phase ก่อนหน้าใช้งานได้จริง
+
+**นอกขอบเขตทุก phase:** การดาวน์โหลด/รัน installer ของ plugin อัตโนมัติ
 
 ## 2. ข้อเท็จจริงของ SoundCraft ที่ออกแบบอิง
 
@@ -47,8 +53,11 @@ soundcraft-skill/
 │   │   ├── SKILL.md
 │   │   ├── scripts/
 │   │   │   ├── make_midi.py          # CLI: JSON spec -> .mid + สรุปข้อความ
-│   │   │   ├── scan_plugins.py       # CLI: สแกนโฟลเดอร์ plugin -> JSON
+│   │   │   ├── scan_plugins.py       # CLI: สแกนโฟลเดอร์ plugin -> JSON + corpus
+│   │   │   ├── analyze_midi.py       # CLI: .mid -> key, คอร์ด, เลขโรมัน (JSON/ข้อความ)
 │   │   │   └── scmidi/
+│   │   │       ├── midi_reader.py    # อ่าน SMF (ใช้ทั้ง analyze และ tests)
+│   │   │       ├── analysis.py       # เดา key (pitch-class profile), จับคอร์ดต่อช่วงเวลา
 │   │   │       ├── theory.py         # parse คอร์ด/เลขโรมัน, voicing, voice leading
 │   │   │       ├── rhythm.py         # step string parser, swing, humanize, fill
 │   │   │       ├── drums.py          # drum maps (gm, soundcraft, custom)
@@ -58,7 +67,10 @@ soundcraft-skill/
 │   ├── soundcraft-setup/SKILL.md
 │   ├── chords/{SKILL.md, references/genres.md}
 │   ├── drums/{SKILL.md, references/grooves.md}
-│   └── plugins/{SKILL.md, references/free-plugins.md}
+│   ├── plugins/{SKILL.md, references/free-plugins.md}
+│   ├── sound-design/{SKILL.md, references/synth-recipes.md}
+│   ├── theory-coach/SKILL.md
+│   └── thai-flavor/{SKILL.md, references/thai-styles.md}
 ├── .claude-plugin/{plugin.json, marketplace.json}   # Claude Code
 ├── .mcp.json                                        # Claude Code + Codex
 ├── .codex-plugin/plugin.json                        # Codex
@@ -204,6 +216,17 @@ key/scale, bpm, bars, genre/feel, mood, density (sparse↔busy), energy arc, ins
 | `chords` | ตีความคำขอ → spec → import → ตั้ง instrument (ค่าเริ่ม `subtractive_synth` หรือ plugin ที่ user ระบุ) |
 | `drums` | ตีความ genre/BPM/feel → spec → import → `drum_synth` หรือ plugin กลองของ user (เลือก `drum_map`) |
 | `plugins` | สแกน → รายงาน → แนะนำ plugin ฟรี (เปิดหน้าดาวน์โหลด, ไม่รัน installer) → โหลดเข้า track |
+| `sound-design` | คำบรรยายเสียง → recipe ของ `subtractive_synth` (osc, filter, envelope, LFO) → อ่านช่วง param จาก MCP → ตั้งค่า → บันทึก preset; ถ้า user มี synth ภายนอก (corpus) ให้คำแนะนำ patch แทน |
+| `theory-coach` | `.mid` ของ user หรือ `file.export_midi` จาก track → `analyze_midi.py` → อธิบาย key/คอร์ด/เลขโรมัน/voice leading และ "ทำไมฟังเป็นแบบนี้"; เสนอ reharm โดยส่งต่อ `chords` |
+| `thai-flavor` | สำเนียงไทย: ลูกทุ่ง, หมอลำ (ลายใหญ่/ลายน้อย/ลายสุดสะแนน), ป๊อปไทย, สามช่า; pentatonic ไทย, แพทเทิร์นกลองยาว/โทน/รำมะนา/ฉิ่ง-ฉาบ map ลงเสียงกลอง GM; วิธีผสมกับ pop/EDM; ส่ง spec ให้ `chords`/`drums` สร้าง |
+
+**sound-design recipes** (`synth-recipes.md`): pad, pluck, lead, bass, 808/sub, keys, brass-ish, arp —
+แต่ละอันระบุ waveform, filter type/cutoff/resonance, ADSR amp+filter, LFO, unison/detune เป็นค่าที่อธิบายด้วย
+หน่วยจริง (Hz, ms) แล้ว map ลง param ของ `subtractive_synth` ตอน implement (ชื่อ/ช่วง param ยืนยันจาก source)
+
+**theory-coach analysis**: key ด้วย Krumhansl–Schmuckler profile (บอกความมั่นใจ + ทางเลือกอันดับ 2),
+คอร์ดต่อช่วง (ค่าเริ่ม 1 beat, รวมช่วงที่ซ้ำ) ด้วย template matching ของ `theory.py` แบบย้อนกลับ;
+ช่วงที่ไม่ชัดให้ติดป้าย `?` แทนการเดา
 
 **คลังความรู้** (`genres.md`, `grooves.md`): pop, ป๊อปไทย/ลูกทุ่ง, ballad, R&B/neo-soul, hip-hop, trap, lo-fi,
 house, techno, rock/indie, funk, jazz, latin/reggaeton, afrobeats — แต่ละแนวมี progression/voicing/rhythm หรือ
@@ -268,3 +291,20 @@ arrangement templates + "ทุก 8 ห้องต้องมีอะไร�
 งานย่อยที่ไม่ต้องตัดสินใจเชิงออกแบบ (คลัง genres/grooves, free-plugins, tests, README, manifests)
 มอบให้ subagent ราคาถูก (Sonnet 5.5 / Haiku 5.5 / GPT ผ่าน T3) — งาน core (theory, midi_writer, spec)
 และการรีวิวทำโดย model หลัก
+
+## 10. Roadmap
+
+| Phase | Skills | ต้องการจาก phase ก่อน |
+|---|---|---|
+| **1** (spec นี้) | soundcraft-core, soundcraft-setup, chords, drums, plugins, sound-design, theory-coach, thai-flavor | — |
+| **2** | bassline-melody, groove-humanize, session-template, reference-brief | theory.py, midi_reader, corpus, MCP flow ที่ใช้ได้จริง |
+| **3** | song-sketch, mix-assist, export-delivery, producer-next-step | ทุก skill ของ phase 1–2 + ความรู้ mix/LUFS ใน backlog §8 |
+
+- **bassline-melody**: เบสตามคอร์ด (R/5/8 rhythm templates, "kick คุมจังหวะลง เบสคุม off-beat"), topline (chord tone บนจังหวะหนัก, phrase 2/4 ห้อง, call-response)
+- **groove-humanize**: ใส่ swing/humanize/feel ให้ MIDI ที่มีอยู่ (`midi_reader` → แปลง → เขียนใหม่)
+- **session-template**: สร้าง session ตามแนวในคำสั่งเดียว (tempo, tracks, instruments, buses, FX พื้นฐาน)
+- **reference-brief**: ชื่อเพลง/ศิลปินอ้างอิง → style profile (BPM, key, groove, palette) ส่งต่อ skill อื่น — ไม่ดาวน์โหลดหรือวิเคราะห์ไฟล์เสียงที่มีลิขสิทธิ์
+- **song-sketch**: โครงเพลงทั้งเพลง (intro/verse/chorus/drop) รวม chords+drums+bass, กฎ "ทุก 8 ห้องต้องมีอะไรเปลี่ยน"
+- **mix-assist**: bounce → LUFS/peak → แนะนำ/ปรับ eq_7band/compressor ทีละขั้น วัดซ้ำ
+- **export-delivery**: bounce master + stems, เป้า LUFS ตามแพลตฟอร์ม (streaming -14 / club ~-8), export MIDI
+- **producer-next-step**: อ่าน session แล้วแนะนำขั้นต่อไป ("ยังไม่มีเบส", "chorus ยังไม่ต่างจาก verse")
