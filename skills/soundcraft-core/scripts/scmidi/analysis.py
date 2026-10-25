@@ -99,10 +99,7 @@ def to_roman(symbol: str, key: Key) -> str:
         return "?"
     chord = parse_chord(symbol)
     text = re.sub(r"\s+", "", symbol).replace("♯", "#").replace("♭", "b")
-    root_match = re.match(r"[A-Ga-g][#b]?", text)
-    suffix = text[root_match.end():].split("/")[0]
-    quality = next((q for q, intervals in QUALITIES.items()
-                    if intervals == chord.intervals), suffix)
+    quality = chord.quality
     scale = _SCALES[key.mode]
     relative = (chord.root - key.tonic) % 12
     accidental = ""
@@ -118,7 +115,7 @@ def to_roman(symbol: str, key: Key) -> str:
     if minor:
         quality = quality[1:]
     bass = "/" + text.rsplit("/", 1)[1] if chord.bass is not None else ""
-    return accidental + numeral + quality + bass
+    return accidental + numeral + quality + "".join(chord.alterations) + bass
 
 
 @dataclass

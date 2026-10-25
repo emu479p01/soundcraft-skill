@@ -56,14 +56,16 @@ def main(argv: Optional[list[str]] = None) -> int:
             raise ValueError("--window must be a finite number greater than zero")
         supplied_key = parse_key(args.key) if args.key is not None else None
         original = read_smf(args.file)
-        validate_song(original)
         tracks = original.tracks
         if args.track is not None:
             tracks = [track for track in tracks if track.name == args.track]
             if not tracks:
                 raise ValueError(f"--track {args.track!r}: no matching track in MIDI file")
-        tracks = [Track(t.name, t.channel, [n for n in t.notes if n.channel != 9]) for t in tracks]
+        # Decode the entire file first; only contributing notes need to be writable.
+        tracks = [Track(t.name, t.channel, [n for n in t.notes
+                                          if n.channel != 9 and n.duration != 0]) for t in tracks]
         song = Song(original.bpm, original.time_signature, tracks, original.ppq)
+        validate_song(song)
         notes = [n for track in tracks for n in track.notes]
         guesses = estimate_key(notes) if notes else []
         selected = next((g for g in guesses if g.key == supplied_key), None) if supplied_key else (

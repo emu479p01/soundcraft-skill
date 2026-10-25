@@ -38,6 +38,12 @@ def _progression(symbols, key="C major"):
     return song
 
 
+def _smf(*bodies):
+    """Build imported-file fixtures without the writer's note validation."""
+    return (b"MThd" + struct.pack(">IHHH", 6, int(len(bodies) > 1), len(bodies), 480)
+            + b"".join(b"MTrk" + struct.pack(">I", len(body)) + body for body in bodies))
+
+
 class KeyTests(unittest.TestCase):
     def test_key_c_major_scale(self):
         notes = [Note(p, i * 480, 480, 80, 0)
@@ -128,6 +134,30 @@ class ChordTests(unittest.TestCase):
             with self.subTest(symbol=symbol, key=key):
                 self.assertEqual(to_roman(symbol, key), expected)
 
+    def test_to_roman_altered_minor_aliases(self):
+        for alteration in ("b9", "#5", "b5"):
+            for alias in ("m", "min", "minor", "-", "mi"):
+                for bass in ("", "/G"):
+                    symbol = "C" + alias + "7" + alteration + bass
+                    with self.subTest(symbol=symbol):
+                        self.assertEqual(to_roman(symbol, Key(0, "major")),
+                                         "i7" + alteration + bass)
+
+    def test_to_roman_preserves_parsed_quality_and_alterations(self):
+        for symbol, expected in [
+            ("Cmb5", "ib5"), ("Cdim", "idim"),
+            ("C7b5", "I7b5"), ("Cdim7b9", "idim7b9"),
+            ("Cm7b5b9", "i7b5b9"), ("C7#9", "I7#9"),
+            ("Cø7", "i7b5"), ("Cø7♭9", "i7b5b9"),
+            ("C°7", "idim7"), ("C°7♭9", "idim7b9"),
+            ("CΔ7#5", "Imaj7#5"), ("CM7b5", "Imaj7b5"),
+            ("Cm/maj7b9", "iMaj7b9"),
+            ("C♯min7♭9/G♯", "#i7b9/G#"),
+            ("c-7♯5/g", "i7#5/g"),
+        ]:
+            with self.subTest(symbol=symbol):
+                self.assertEqual(to_roman(symbol, Key(0, "major")), expected)
+
 
 class DetectionTests(unittest.TestCase):
     def test_detect_roundtrip(self):
@@ -215,6 +245,52 @@ class AnalyzeCliTests(unittest.TestCase):
         mixed = self.cli(self.write(song, "mixed.mid"), "--json")
         self.assertEqual(mixed.returncode, 0, mixed.stderr)
         self.assertEqual(json.loads(mixed.stdout), clean)
+
+    def test_cli_zero_duration_notes_do_not_change_analysis(self):
+        on = bytes.fromhex("00903c500090405000904350")
+        end = bytes.fromhex("8360803c00008040000080430000ff2f00")
+        harmony = b"\x00\xff\x03\x07Harmony" + on + end
+        path = self.root / "imported.mid"
+        path.write_bytes(_smf(on + end))
+        clean = self.cli(path, "--json")
+        self.assertEqual(clean.returncode, 0, clean.stderr)
+        expected = json.loads(clean.stdout)
+        self.assertEqual([c["symbol"] for c in expected["chords"]], ["C"])
+        for data, options in [
+            (_smf(on + bytes.fromhex("0099245000892400") + end), ()),
+            (_smf(on + bytes.fromhex("00913c5000813c00") + end), ()),
+            (_smf(harmony, b"\x00\xff\x03\x05Other"
+                  + bytes.fromhex("00913c5000813c0000ff2f00")),
+             ("--track", "Harmony")),
+        ]:
+            with self.subTest(data=data, options=options):
+                path.write_bytes(data)
+                result = self.cli(path, *options, "--json")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), expected)
+        path.write_bytes(_smf(bytes.fromhex("00903c5000803c0000ff2f00")))
+        empty = self.cli(path, "--json")
+        self.assertEqual(empty.returncode, 0, empty.stderr)
+        self.assertIsNone(json.loads(empty.stdout)["key"])
+        self.assertEqual(json.loads(empty.stdout)["chords"], [])
+
+    def test_cli_filtering_does_not_hide_decoding_or_metadata_errors(self):
+        harmony = (b"\x00\xff\x03\x07Harmony"
+                   + bytes.fromhex("00903c500090405000904350"
+                                   "8360803c00008040000080430000ff2f00"))
+        path = self.root / "invalid-import.mid"
+        for data in (
+            _smf(harmony, b"\x00\xff\x03\x05Other\x00\x99\x80\x50"),
+            _smf(harmony, b"\x00\xff\x03\x05Other\x00\x91\x3c"),
+            _smf(harmony) + b"MTr",
+            _smf(b"\x00\xff\x58\x04\x00\x02\x18\x08" + harmony),
+        ):
+            with self.subTest(data=data):
+                path.write_bytes(data)
+                result = self.cli(path, "--track", "Harmony", "--json")
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(result.stdout, "")
+                self.assertNotIn("Traceback", result.stderr)
 
     def test_cli_track_filter_controls_both_analyses_and_unicode_paths(self):
         piano = _progression("Dm - Gm - A7 - Dm", "D minor").tracks[0]

@@ -104,6 +104,8 @@ class Chord:
     intervals: tuple[int, ...]
     bass: Optional[int]
     symbol: str
+    quality: str = ""  # Canonical base quality, before alterations.
+    alterations: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -228,7 +230,8 @@ def parse_chord(symbol: str) -> Chord:
     if parts is None:
         raise _quality_error("chord symbol", original, rest, f" after root {root_text!r}")
     quality, alterations = parts
-    return Chord(_note_value(root_text), _intervals(quality, alterations), bass, original)
+    return Chord(_note_value(root_text), _intervals(quality, alterations), bass,
+                 original, quality, tuple(alterations))
 
 
 def parse_key(text: str) -> Key:
@@ -313,7 +316,8 @@ def parse_roman(numeral: str, key: Key) -> Chord:
                 f" for a lowercase (minor) numeral {degree!r}",
             )
     symbol = _spell(root, key, accidental) + quality + "".join(alterations)
-    return Chord(root, _intervals(quality, alterations), None, symbol)
+    return Chord(root, _intervals(quality, alterations), None, symbol,
+                 quality, tuple(alterations))
 
 
 def parse_chord_token(token: str, key: Optional[Key]) -> Chord:
