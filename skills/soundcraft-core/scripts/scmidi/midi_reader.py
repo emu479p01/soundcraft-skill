@@ -54,6 +54,8 @@ def _chunks(data: bytes) -> list[tuple[bytes, bytes]]:
             raise MidiError(f"truncated {kind!r} chunk")
         out.append((kind, body))
         pos += 8 + length
+    if pos != len(data):
+        raise MidiError("truncated MIDI chunk header")
     return out
 
 
@@ -113,9 +115,15 @@ def _parse_track(body: bytes, glob: _Globals) -> tuple[str, dict[int, list[Note]
             raise MidiError("data byte without a running status")
         kind = status & 0xF0
         channel = status & 0x0F
+        if not 0x80 <= status <= 0xEF:
+            raise MidiError(f"invalid channel event status 0x{status:02x}")
+        if data1 & 0x80:
+            raise MidiError("channel event data bytes must be 0-127")
         if kind in (0xC0, 0xD0):
             continue  # one data byte, not note-related
         data2 = cur.byte()
+        if data2 & 0x80:
+            raise MidiError("channel event data bytes must be 0-127")
         if kind == 0x90 and data2 > 0:
             pending.setdefault((channel, data1), deque()).append((tick, data2))
         elif kind in (0x80, 0x90):  # 0x90 with velocity 0 is a note-off
@@ -133,11 +141,16 @@ def decode_smf(data: bytes) -> Song:
     chunks = _chunks(bytes(data))
     if not chunks or chunks[0][0] != b"MThd" or len(chunks[0][1]) < 6:
         raise MidiError("not a Standard MIDI File (missing MThd header)")
-    fmt, _ntrks, division = struct.unpack(">HHH", chunks[0][1][:6])
+    fmt, ntrks, division = struct.unpack(">HHH", chunks[0][1][:6])
     if fmt not in (0, 1):
         raise MidiError(f"unsupported SMF format {fmt}")
     if division & 0x8000:
         raise MidiError("SMPTE time division is not supported")
+    if division == 0:
+        raise MidiError("PPQ time division must be greater than zero")
+    actual_tracks = sum(kind == b"MTrk" for kind, _ in chunks[1:])
+    if ntrks == 0 or ntrks != actual_tracks or (fmt == 0 and ntrks != 1):
+        raise MidiError(f"invalid track count: format {fmt} declares {ntrks}, found {actual_tracks}")
     glob = _Globals()
     tracks: list[Track] = []
     for kind, body in chunks[1:]:
