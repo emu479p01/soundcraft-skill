@@ -30,7 +30,7 @@ Every task header has a **Model** line. The orchestrator dispatches each impleme
 - Nothing is written unless validation passes: pitch 0–127, velocity 1–127, start ≥ 0, duration > 0.
 - SKILL.md frontmatter has only spec fields (`name`, `description`, optional `license`, `metadata`). `name` = folder name, matches `^[a-z0-9]+(-[a-z0-9]+)*$`, ≤64 chars. `description` ≤1024 chars.
 - Every SKILL.md has these H2 sections in order: `When to use`, `Workflow`, `Style table`, `Spec pattern`, `Checks`, `Limits`, `Related skills`. `Style table` and `Spec pattern` may say "N/A — <reason>".
-- User-facing skill prose is Thai with English technical terms. Code, identifiers and comments are English.
+- **Every file in the repo is written in English**: code, comments, SKILL.md, references, README and docs. Thai characters are allowed only (a) in parentheses after a romanized Thai style or instrument name, e.g. "Luk thung (ลูกทุ่ง)", and (b) as test data for non-ASCII paths. Each SKILL.md `Workflow` ends with the line "Reply to the user in the language they wrote in."
 - Never auto-download or run plugin installers. Any system change (install software, edit harness config) needs explicit user confirmation, written into the skill workflow.
 - License MIT, "Copyright (c) 2026 Chaiyaporn Santangjai" (`LICENSE` already exists). Write all content in our own words. Credits go in `CREDITS.md`.
 - Commit after every task with a message ending in `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
@@ -609,11 +609,11 @@ Every task header has a **Model** line. The orchestrator dispatches each impleme
 
 **Files:** `skills/thai-flavor/SKILL.md`, `skills/thai-flavor/references/thai-styles.md`
 
-- **Styles:** ลูกทุ่ง, หมอลำ (ลายใหญ่, ลายน้อย, ลายสุดสะแนน), ป๊อปไทย, สามช่า. Each has:
+- **Styles:** Luk thung (ลูกทุ่ง), Mor lam (หมอลำ) — Lai yai (ลายใหญ่), Lai noi (ลายน้อย), Lai sut sanaen (ลายสุดสะแนน) — Thai pop (ป๊อปไทย), Sam cha (สามช่า). Each has:
   - scale/mode (Thai pentatonic sets as pitch-class lists);
   - typical progressions;
   - BPM;
-  - a groove mapped onto **existing `VOICES` only** (e.g. ฉิ่ง→`ride` or `cowbell`, ฉาบ→`crash`/`open_hat`, กลองยาว/โทน/รำมะนา→toms/`perc`). State each mapping and why;
+  - a groove mapped onto **existing `VOICES` only** (e.g. ching (ฉิ่ง)→`ride` or `cowbell`, chap (ฉาบ)→`crash`/`open_hat`, klong yao (กลองยาว)/thon (โทน)/rammana (รำมะนา)→toms/`perc`). State each mapping and why;
   - one chords spec + one drums spec.
 - **Fusion:** guidance on mixing with pop/EDM.
 - **Uncertain facts:** where a cultural or musical fact is uncertain, say so in the text rather than inventing it.
@@ -626,7 +626,7 @@ Every task header has a **Model** line. The orchestrator dispatches each impleme
 **Model:** haiku
 
 **Files:**
-- Create: `README.md` (Thai first, then English), `CREDITS.md`
+- Create: `README.md` (English), `CREDITS.md`
 
 - [ ] **Step 1: Write `README.md`.**
   - What it is, the skill list, requirements (SoundCraft, Python ≥3.9).
@@ -634,7 +634,7 @@ Every task header has a **Model** line. The orchestrator dispatches each impleme
     - Claude Code — `/plugin marketplace add <your-github>/soundcraft-skill`, then `/plugin install soundcraft-skills@<marketplace>`.
     - Codex — the plugin marketplace or `python install.py --codex`.
     - Antigravity — `agy plugin install <url>` or `python install.py --antigravity`.
-  - Example prompts in Thai.
+  - Example prompts (English), plus a note that skills reply in the user's language.
   - Roadmap (spec §10).
   - License line.
 - [ ] **Step 2: Write `CREDITS.md`.** The spec §8 table, plus every repo named in `<!-- ideas: … -->` comments (`grep -r "ideas:" skills`). MIT sources keep their copyright line.
