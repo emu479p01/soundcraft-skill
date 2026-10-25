@@ -1,6 +1,6 @@
 # Implementation decisions
 
-This record preserves the fifteen rulings supplied for Phase 1, including rationale and cost if wrong.
+This record preserves the sixteen rulings supplied for Phase 1, including rationale and cost if wrong.
 
 1. **T6 error paths:** T6 wraps `TheoryError`/`ValueError` from theory/rhythm/drums into `SpecError` with a field path. **Rationale:** spec §4 requires a path in messages. **Cost if wrong:** small error-plumbing refactor.
 2. **T9 install tests:** Use a fake repository fixture in a temporary directory, not the real repository. **Rationale:** installation must be testable before skills exist. **Cost if wrong:** none functionally.
@@ -17,3 +17,4 @@ This record preserves the fifteen rulings supplied for Phase 1, including ration
 13. **Remaining work:** Use concise briefs and one active implementer; Luna medium for bounded docs/mechanical tasks, Sonnet medium when cross-provider fallback is needed or prose requires broader judgment; one scoped standard-tier review/application per task, with no duplicate test runs without changed code or a concrete concern. **Rationale:** latest user explicitly prioritizes economy. **Cost if wrong:** a scoped correction or capability escalation only when demonstrated necessary.
 14. **Final integration review:** Use gpt-6.1-sol high rather than automatically selecting a higher-price model. **Rationale:** prior task reviews and live engine evidence narrow remaining risk, and the latest user explicitly prioritizes economical model selection. **Cost if wrong:** a cross-task defect may require a later scoped correction.
 15. **Combined final review:** Combine Task 18 documentation review with the final whole-branch integration review in one reviewer dispatch, checking both requirement sets. **Rationale:** avoids a duplicate final-context review seat. **Cost if wrong:** documentation and integration receive one independent pass rather than two overlapping passes.
+16. **Requested phrase duration:** Preserve requested trailing-rest duration with an optional intended track-end tick carried from renderer to SMF EOT, at least final note-off; retain existing direct callers/defaults and do not lengthen sounding notes. **Rationale:** this restores requested phrase duration without adding composition features. **Cost if wrong:** a host may ignore EOT; document/test host behavior separately rather than invent fake notes.

@@ -5,7 +5,7 @@ description: Use when exporting chords or drums to a .mid file, using the local 
 
 ## When to use
 
-Export requested music directly, including when MCP is offline. Use the CLI table below for MIDI analysis or plugin inventory. Read [the command reference](references/soundcraft-commands.md) before SoundCraft operations; it contains exact params, plugin IDs, drum mappings and recovery classes.
+Export requested music directly, including when MCP is offline. Use the CLI table below for MIDI analysis or plugin inventory. Read [the command reference](references/soundcraft-commands.md) before SoundCraft operations; it contains exact params, plugin IDs, drum mappings and recovery classes. For connection recovery, use [runtime harness setup](references/harness-setup.md), which is included in copied installations.
 
 ## Workflow
 
@@ -65,6 +65,8 @@ All three CLIs support `-h`/`--help` (exit 0); argparse usage errors exit 2. Err
 | `scan_plugins.py` | `--extra-dir DIR` repeatable, adds to standard OS roots; `--json` emits `plugins`, `unsupported`, `missing_dirs`, otherwise grouped text/warnings. `--write-corpus [PATH]` writes timestamp/platform plus inventory; default `~/.soundcraft-skills/plugins.json`. Categories inferred from filenames; no binary is opened/executed | 0 success including missing-root/unsupported-format warnings; 2 invalid arguments/root; 1 I/O/unexpected error |
 
 Validate before writing: MIDI pitch 0–127, velocity 1–127, start ≥0, duration >0. Unknown fields fail with field paths and spelling suggestions. Output is SMF type 1, PPQ 480, tempo/meter on track 0; drums use channel index 9, chord tracks skip 9. Compare summary to intent before claiming success.
+
+Generated musical tracks retain the requested phrase boundary, including trailing rests and all-rest custom chords, in their encoded End-of-Track event. EOT is also at least the last note-off; notes are neither stretched nor truncated. Host import/loop behavior must be checked separately. The Phase 1 reader/analysis does not preserve trailing-rest end times when decoding and rewriting MIDI; that is deferred to Phase 2.
 
 ## Limits
 

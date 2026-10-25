@@ -48,7 +48,7 @@ def encode_smf(song: Song) -> bytes:
     for track in song.tracks:
         name = track.name.encode("utf-8")
         events: list[tuple[int, int, bytes]] = [(0, -1, b"\xff\x03" + _vlq(len(name)) + name)]
-        end_tick = 0
+        end_tick = track.intended_end_tick if track.intended_end_tick is not None else 0
         for note in track.notes:
             end = note.start + note.duration
             end_tick = max(end_tick, end)

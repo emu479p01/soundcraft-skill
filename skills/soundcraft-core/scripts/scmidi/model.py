@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 
 class MidiError(ValueError):
@@ -22,6 +23,8 @@ class Track:
     name: str
     channel: int
     notes: list[Note] = field(default_factory=list)
+    # Requested phrase boundary, including rests; None retains note-derived ends.
+    intended_end_tick: Optional[int] = None
 
 
 @dataclass
@@ -71,5 +74,9 @@ def validate_song(song: Song) -> None:
     for track in song.tracks:
         if not _is_int(track.channel) or not 0 <= track.channel <= 15:
             raise MidiError(f"track channel must be 0-15, got {track.channel!r}")
+        if track.intended_end_tick is not None and (
+                not _is_int(track.intended_end_tick) or track.intended_end_tick < 0):
+            raise MidiError("intended_end_tick must be a nonnegative integer or None, "
+                            f"got {track.intended_end_tick!r}")
         for note in track.notes:
             validate_note(note)

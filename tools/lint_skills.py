@@ -146,9 +146,9 @@ def _document(text: str, path: Path, skill_dir: Path, offset: int,
             content = []
             start = number + 1
             continue
-        heading = re.match(r"^ {0,3}##\s+(.+?)\s*#*\s*$", line)
+        heading = re.match(r"^ {0,3}##\s+(.+?)\s*$", line)
         if heading:
-            headings.append(heading[1])
+            headings.append(re.sub(r"\s+#+$", "", heading[1]))
     if fence is not None and language == "json":
         errors.append(f"{path}:{start - 1}: unclosed JSON fence; add matching {fence}")
     return headings

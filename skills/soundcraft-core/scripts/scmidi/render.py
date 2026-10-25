@@ -13,7 +13,7 @@ DRUM_CHANNEL = 9
 
 
 def _chord_track(t: dict, path: str, key: Optional[Key], bpm: float, bpb: float,
-                 bar_ticks: int, channel: int) -> tuple[list[Note], list[dict]]:
+                 bar_ticks: int, channel: int) -> tuple[list[Note], list[dict], int]:
     custom = parse_steps(t["steps"], CUSTOM_STEPS) if t["rhythm"] == "custom" else None
     strum = ms_to_ticks(t["strum_ms"], bpm, PPQ)
     notes: list[Note] = []
@@ -51,7 +51,7 @@ def _chord_track(t: dict, path: str, key: Optional[Key], bpm: float, bpb: float,
             bars.append({"bar": bar, "chord": symbol,
                          "notes": [pitch_name(p) for p in pitches]})
             start += length
-    return humanize(notes, t["humanize"], PPQ, t["seed"]), bars
+    return humanize(notes, t["humanize"], PPQ, t["seed"]), bars, start
 
 
 def _drum_track(t: dict, bpm: float, bpb: float, bar_ticks: int,
@@ -109,19 +109,20 @@ def render_detailed(spec: dict) -> tuple[Song, list[str], list[dict]]:
         if t["type"] == "drums":
             channel = DRUM_CHANNEL
             notes, bars = _drum_track(t, bpm, bpb, bar_ticks, channel)
+            intended_end_tick = t["bars"] * bar_ticks
         else:
             if next_channel == DRUM_CHANNEL:
                 next_channel += 1
             channel = next_channel
             next_channel += 1
-            notes, bars = _chord_track(t, path, key, bpm, bpb, bar_ticks, channel)
+            notes, bars, intended_end_tick = _chord_track(t, path, key, bpm, bpb, bar_ticks, channel)
         for note in notes:
             try:
                 validate_note(note)
             except MidiError as e:
                 raise SpecError(path, str(e)) from None
         notes.sort(key=lambda n: (n.start, n.pitch))
-        tracks.append(Track(t["name"], channel, notes))
+        tracks.append(Track(t["name"], channel, notes, intended_end_tick))
         lines.extend(_summary(t["type"], bars))
         details.append({"name": t["name"], "bars": bars})
     return Song(bpm=bpm, time_signature=(num, den), tracks=tracks, ppq=PPQ), lines, details

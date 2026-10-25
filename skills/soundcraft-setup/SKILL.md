@@ -5,7 +5,7 @@ description: Use when SoundCraft or Python is missing, MCP cannot connect, file-
 
 ## When to use
 
-Diagnose prerequisites, configure the user's chosen harness with permission, and verify sound. Read [command contracts and access rules](../soundcraft-core/references/soundcraft-commands.md) and [harness installation notes](../../docs/harness-notes.md) for the relevant host. Native Codex/Antigravity plugin coexistence remains unverified; manifest validation is not an installation test.
+Diagnose prerequisites, configure the user's chosen harness with permission, and verify sound. Read [command contracts and access rules](../soundcraft-core/references/soundcraft-commands.md) and [runtime harness setup](../soundcraft-core/references/harness-setup.md) for the relevant host. Native Codex/Antigravity plugin coexistence remains unverified; manifest validation is not an installation test.
 
 ## Workflow
 
@@ -13,18 +13,12 @@ Follow these four steps in this order:
 
 1. `soundcraft-cli --version` → missing: explain how to install per OS + Releases link, proceed once the user confirms
 2. Python 3 → missing: recommend `winget install Python.Python.3` / `brew install python` / the package manager, run when the user permits
-3. MCP `list_commands` → fails: show the setup steps for the harness in use, or recommend `install.py`
+3. MCP `list_commands` → fails: use the packaged runtime harness setup for manual recovery, or the source-checkout-only installer when a checkout is available
 4. Smoke test: C–G–Am–F, 4 bars → import → `bounce_mix` → report peak/LUFS (peak > -inf = pass)
 
 **Steps 1–2: prerequisites.** On Windows, macOS or Linux, use the matching OS/architecture asset and its instructions from [SoundCraft Releases](https://github.com/storytold/soundcraft/releases); confirm `soundcraft-cli` is on PATH. Do not invent package names or assume a release asset exists for every platform. Check `python --version` (or `python3 --version` on macOS/Linux); require ≥3.9, stdlib only. Propose the exact software/source and scope before installation. Existing consent for that same action suffices; otherwise wait for explicit authorization. Missing prerequisites leave setup incomplete; explain the next step rather than claiming success.
 
-**Step 3: harness and file access.** Run commands from this skill's directory. Before installing skills or editing config, present the proposed changes and obtain explicit authorization, respecting consent already granted. These are instructions to apply only within that authorization:
-
-- Claude Code: from the host's command UI, `/plugin marketplace add "/absolute/path/to/soundcraft-skill"`, then `/plugin install soundcraft-skills@soundcraft-skills`. The package supplies `.mcp.json`. For manual registration instead, the documented CLI form is `claude mcp add soundcraft -- soundcraft-cli mcp --demo`; `--demo` is optional. Reconcile an existing registration rather than adding duplicates.
-- Codex fallback: preview `python ../../install.py --codex --dry-run`, review, then apply `python ../../install.py --codex` after authorization. It copies skills to `~/.agents/skills` and merges `[mcp_servers.soundcraft]` in `~/.codex/config.toml` with `command = "soundcraft-cli"`, `args = ["mcp"]`.
-- Antigravity fallback: preview `python ../../install.py --antigravity --dry-run`, then authorized apply without `--dry-run`. It copies skills to `~/.gemini/config/skills` and merges `mcpServers.soundcraft` in `~/.gemini/config/mcp_config.json`. Manual setup uses `command: "soundcraft-cli"`, `args: ["mcp"]` in that entry. The repository's `plugin.json`/`mcp_config.json` are the native packaging scaffold; see harness notes for verified limits.
-
-`install.py --all` targets both fallback hosts; `--link` requests links with copy fallback. Existing changed configs are backed up; conflicting skills/server entries require manual reconciliation, never deletion by assumption. The installer does not install SoundCraft/Python or grant file roots. Refresh/restart the chosen harness connection and retry `list_commands` after setup.
+**Step 3: harness and file access.** Before installing skills or editing config, present the proposed changes and obtain explicit authorization, respecting consent already granted. Follow [runtime harness setup](../soundcraft-core/references/harness-setup.md) for Claude Code, Codex or Antigravity. It ships with copied skills and includes manual MCP recovery without a repository checkout. The installer is **source-checkout-only**: obtain the real user-provided absolute checkout path, verify its `install.py`, then use the reference's preview/apply commands. Never infer a checkout from this installed skill's ancestors. Refresh/restart the chosen harness connection and retry `list_commands` after setup.
 
 Canonical manifests launch with args `["mcp"]`: **no read roots and no write roots**, so import, bounce and preset file access are denied. First choose an existing working directory with the user. For example, if the approved existing folder is `C:/Music/Work`, propose the server's full argument array:
 

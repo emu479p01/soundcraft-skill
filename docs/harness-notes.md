@@ -90,10 +90,24 @@ manifest is **unverified**. JSON shape checks do not prove native support.
 
 ## Fallback installer verification and behavior
 
-Installer tests use a fake repository with a fake `chords` skill and temporary
-homes exclusively; no production repository skills are installed. No real user
-config, installed skills, marketplace registration, or software installation was
-changed. No push or publication was performed.
+The original installer unit tests (`tests/test_install.py`) use a fake repository
+with a fake `chords` skill and temporary homes. Separately, the final integration
+probe (`fallback-install-probe.json` in the local review artifacts) copied this
+repository's actual eight skills into both temporary Codex and Antigravity fake
+homes and confirmed the core CLI was present. It exposed setup's missing
+`../../docs/harness-notes.md` link in both copies, plus source-only installer
+paths that could not work in a copied installation.
+
+The final correction adds `tests/test_installed_guidance.py`: it copies the actual
+eight-skill package into two separate temporary fake homes and checks all relative
+Markdown file links and required runtime recovery guidance. Setup now links to
+`../soundcraft-core/references/harness-setup.md`, included in both copies; its
+runtime links resolve in both layouts. The source-checkout-only installer route
+requires a verified user-provided absolute checkout path. Installed users can
+recover MCP manually without that checkout. These are package-copy/link checks,
+not native host loading or a real-user installation. No real user config,
+installed skills, marketplace registration, or software installation was changed.
+No push or publication was performed.
 
 `install(targets, home, repo, dry_run=False, link=False)` accepts Codex and
 Antigravity, and the CLI exposes `--codex`, `--antigravity`, `--all`, `--dry-run`,
@@ -133,8 +147,10 @@ custom permissions/metadata are not preserved (POSIX siblings start with mode 06
 These checks do not provide a filesystem transaction or serialize unrelated
 writers: another writer can still race the final content check and replacement.
 
-The supplied Python runtime is 3.12.14; an actual Python 3.9 runtime was not tested.
-Implementation and tests use standard-library APIs available in Python 3.9.
+The Task 9 record reported Python 3.12.14. The final correction's actual runtime
+reports Python 3.14.7; an actual Python 3.9 runtime was not tested. Implementation
+and tests use standard-library APIs available in Python 3.9; a Python 3.9 grammar
+parse checks source syntax only, not execution on that older interpreter.
 Original validation: 25 Task 9 tests and 167 full-suite tests passed with no skips.
 The Task 9 fix adds regressions for multiline conflicts, post-backup substitutions,
 late config/parent links, atomic replacement failure/cleanup, and new config paths.
@@ -157,4 +173,4 @@ On 2026-10-25, SoundCraft CLI 0.12.1 was exercised in three isolated headless se
 
 All three WAVs were nonzero in size, had finite measured peaks, and remained below 0 dBFS (no clipping). This is evidence for the real CLI's isolated import/instrument/bounce flow on this machine and version only. It does not test MCP transport, integration through a native agent harness, third-party hosting, listening quality, or cultural fidelity. Keep those explicitly untested. No software installation or harness configuration change was performed for this smoke run.
 
-The earlier Claude validator results and Codex parser probe above remain limited to the installed builds described there. They do not establish native Codex or Antigravity plugin coexistence or verified installation. The prior statement that actual installation was untested remains accurate for the skills/installer; the separate SoundCraft CLI smoke above does not change it. `README_MISSING` is resolved by adding this repository README. `ICON_MISSING` remains a directory-submission warning; no icon-readiness claim is made.
+The earlier Claude validator results and Codex parser probe above remain limited to the installed builds described there. They do not establish native Codex or Antigravity plugin coexistence or verified installation. Actual eight-skill temporary-home copies were tested separately as described above; native host loading of that package and real-user installation remain untested. The separate SoundCraft CLI smoke does not change those limits, and host import/loop handling of trailing-rest MIDI EOT boundaries has not been retested. `README_MISSING` is resolved by adding this repository README. `ICON_MISSING` remains a directory-submission warning; no icon-readiness claim is made.

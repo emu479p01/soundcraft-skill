@@ -116,6 +116,17 @@ class SkillLintTests(unittest.TestCase):
             path.write_text(path.read_text().replace("## Checks\n## Limits", replacement))
             self.assertTrue(any("sections" in e for e in self.linter.lint_skill(folder)))
 
+    def test_closing_heading_hashes_require_whitespace(self):
+        for heading, valid in (("Checks", True), ("Checks ###", True),
+                               ("Checks\t###", True), ("Checks###", False)):
+            with self.subTest(heading=heading):
+                folder = self.skill()
+                path = folder / "SKILL.md"
+                path.write_text(path.read_text().replace("## Checks\n", "## " + heading + "\n"),
+                                encoding="utf-8")
+                errors = self.linter.lint_skill(folder)
+                self.assertEqual(any("sections" in e for e in errors), not valid, errors)
+
     def test_lint_all_ignores_directories_without_skill(self):
         self.skill()
         (self.root / "skills/unfinished").mkdir()
