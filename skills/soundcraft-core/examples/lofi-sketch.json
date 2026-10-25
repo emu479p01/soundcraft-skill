@@ -1,0 +1,24 @@
+{
+  "bpm": 90, "time_signature": [4, 4], "key": "D minor",
+  "output": "lofi-sketch.mid",
+  "tracks": [
+    {
+      "name": "Chords", "type": "chords",
+      "progression": ["Dm9", "Gm7", {"chord": "Bbmaj7", "beats": 2}, "A7b9"],
+      "chord_length": "1bar",
+      "voicing": "open", "octave": 4,
+      "rhythm": "pad", "velocity": 80, "humanize": 0.15, "repeat": 2
+    },
+    {
+      "name": "Drums", "type": "drums",
+      "steps": 16, "swing": 0.58, "bars": 8,
+      "pattern": {
+        "kick":  "x.....x...x.....",
+        "snare": "....X.......X..g",
+        "hat":   "x.x.x.x.x.x.x.x."
+      },
+      "fill": {"every": 4, "pattern": {"snare": "........x.x.XxXx"}},
+      "drum_map": "gm"
+    }
+  ]
+}
