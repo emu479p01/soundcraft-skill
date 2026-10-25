@@ -200,7 +200,6 @@ class KeyTest(unittest.TestCase):
         self.assertEqual(parse_key("F# major"), Key(6, "major"))
         self.assertEqual(parse_key("C"), Key(0, "major"))
         self.assertEqual(parse_key("Bb"), Key(10, "major"))
-        self.assertEqual(parse_key("Bb"), Key(10, "major"))
         self.assertEqual(parse_key("  d   minor "), Key(2, "minor"))
         self.assertEqual(parse_key("D Minor"), Key(2, "minor"))
         self.assertEqual(parse_key("Bbm"), Key(10, "minor"))
@@ -269,6 +268,11 @@ class RomanTest(unittest.TestCase):
             ("Vsus4", 7, QUALITIES["sus4"]),
             ("vii°/V", 6, QUALITIES["dim"]),
             ("V/ii", 9, QUALITIES[""]),
+            ("V/vi", 4, QUALITIES[""]),
+            ("vii°/vi", 8, QUALITIES["dim"]),
+            ("vii°7/ii", 1, QUALITIES["dim7"]),
+            ("bVII/vi", 7, QUALITIES[""]),
+            ("viiø7/V", 6, QUALITIES["m7b5"]),
             (" V7 / IV ", 0, QUALITIES["7"]),
         ]
         for numeral, root, intervals in cases:
@@ -292,6 +296,17 @@ class RomanTest(unittest.TestCase):
         self.assertIn("VIII", str(ctx.exception))
         with self.assertRaises(TheoryError):
             parse_roman("Vi", key)
+        for bad in ["iadd9", "ivadd11"]:
+            with self.subTest(bad=bad):
+                with self.assertRaises(TheoryError) as ctx:
+                    parse_roman(bad, key)
+                self.assertIn(bad, str(ctx.exception))
+                self.assertIn("quality", str(ctx.exception))
+        self.assertEqual(parse_roman("Iadd9", key).intervals, QUALITIES["add9"])
+
+    def test_key_numerals_stay_natural_minor(self):
+        self.assertEqual(parse_roman("vii°", Key(2, "minor")).root, 0)
+        self.assertEqual(parse_roman("VII", Key(2, "minor")).root, 0)
 
 
 class ChordTokenTest(unittest.TestCase):

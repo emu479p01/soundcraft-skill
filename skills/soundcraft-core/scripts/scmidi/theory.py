@@ -87,7 +87,7 @@ _ROMAN_RE = re.compile(rf"^([b#]?)({_NUMERAL_ALT})([^/]*)(?:/([b#]?)({_NUMERAL_A
 # Quality used for a lowercase (minor) numeral, keyed by the plain quality.
 _MINOR_OF = {"": "m", "6": "m6", "7": "m7", "maj7": "mMaj7", "9": "m9", "11": "m11"}
 # Qualities with a major third and no minor counterpart in QUALITIES.
-_MAJOR_ONLY = {"aug", "maj9", "13", "maj13"}
+_MAJOR_ONLY = {"aug", "maj9", "13", "maj13", "add9", "add11"}
 
 # Tonics whose conventional key signature uses flats.
 _FLAT_KEYS = {"major": {5, 10, 3, 8, 1, 6}, "minor": {2, 7, 0, 5, 10, 3}}
@@ -254,9 +254,12 @@ def parse_key(text: str) -> Key:
     return Key(_note_value(root_match.group(1)), mode)
 
 
-def _degree_root(accidental: str, numeral: str, tonic: int, mode: str) -> int:
+def _degree_root(
+    accidental: str, numeral: str, tonic: int, mode: str, raised_seventh: bool = False
+) -> int:
     scale = _MINOR_SCALE if mode == "minor" else _MAJOR_SCALE
-    offset = scale[_NUMERALS.index(numeral.upper())]
+    index = _NUMERALS.index(numeral.upper())
+    offset = 11 if raised_seventh and index == 6 else scale[index]
     shift = {"": 0, "#": 1, "b": -1}[accidental]
     return (tonic + offset + shift) % 12
 
@@ -278,6 +281,8 @@ def parse_roman(numeral: str, key: Key) -> Chord:
     Case gives the quality (upper = major, lower = minor). Degrees come from the
     major scale, or the natural minor scale in a minor key. 'X/Y' builds X on
     degree Y of the key, treating Y as a major key if uppercase, minor if lowercase.
+    In a secondary chord, degree VII is always the raised leading tone (11 semitones
+    above Y), so vii°/vi in C is G#dim, while the key's own numerals stay natural.
     """
     original = str(numeral).strip()
     match = _roman_match(original)
@@ -291,7 +296,7 @@ def parse_roman(numeral: str, key: Key) -> Chord:
     if target is not None:
         tonic = _degree_root(target_acc, target, key.tonic, key.mode)
         mode = "major" if target.isupper() else "minor"
-    root = _degree_root(accidental, degree, tonic, mode)
+    root = _degree_root(accidental, degree, tonic, mode, raised_seventh=target is not None)
 
     parts = _split_quality(_normalise_quality(suffix))
     if parts is None:
