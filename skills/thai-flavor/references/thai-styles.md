@@ -39,7 +39,7 @@ Ching (ฉิ่ง) has multiple normal and special patterns; Suwannee Choosen'
 
 ## Mor lam (หมอลำ): Lai yai (ลายใหญ่)
 
-- **Mode and PC set:** Pinned reference, center A, `[9, 0, 2, 4, 7]` (A, C, D, E, G), drone E–A. This is the reference's modal center/order, not a universal tuning. Yai and noi share the same pitch collection but have different centers, drones, contours and melodic emphasis.
+- **Mode and PC set:** Pinned reference, center A, `[9, 0, 2, 4, 7]` (A, C, D, E, G), drone E–A. This is the reference's modal center/order, not a universal tuning. Yai and noi share a minor-pentatonic interval pattern under transposition, but not the same absolute pitch classes: yai includes E, while noi includes F. They also have different centers, drone references, contours and melodic emphasis. Yai and sut sanaen share the absolute A–C–D–E–G collection, with different centers and drone references.
 - **Progression:** Illustrative modal-symbol sketch `Am–G–Am–G`; Western minor/major triads are a fusion accompaniment choice, not an ethnographic transcription. Omit a `key` field; A minor would misrepresent the mode.
 - **Tempo/groove:** 84 BPM starting point for a spacious long-way phrase; slower or free-tempo Mor lam exists. Ching→`ride` for bright sustained pulse, chap→`crash` for phrase accents, thon (โทน)→`tom_low` for a low pitched-body proxy. None is an authentic timbre or full rhythm.
 - **Chords spec:**
@@ -70,7 +70,7 @@ Ching (ฉิ่ง) has multiple normal and special patterns; Suwannee Choosen'
 
 ## Mor lam (หมอลำ): Lai noi (ลายน้อย)
 
-- **Mode and PC set:** Pinned reference, center D, `[2, 5, 7, 9, 0]` (D, F, G, A, C), drone D–A. Yai shares these pitch classes, but its center A, E–A drone reference and melodic contour differ. Do not treat the two modes as interchangeable.
+- **Mode and PC set:** Pinned reference, center D, `[2, 5, 7, 9, 0]` (D, F, G, A, C), drone D–A. Yai shares the minor-pentatonic interval pattern under transposition, but its absolute collection includes E where noi includes F; its center A, E–A drone reference and melodic contour also differ. Do not treat the two modes as interchangeable.
 - **Progression:** Illustrative modal-symbol sketch `Dm–C–Dm–C`; Western minor/major triads are a fusion choice, not an authentic traditional progression. Omit `key`; D minor does not represent the mode. A slower/free phrase may be more appropriate to a particular reference.
 - **Tempo/groove:** 80 BPM starting point, spacious long-way feel. Ching→`open_hat` for a sustained/open brightness contrast; chap→`crash` as a phrase marker; rammana (รำมะนา)→`tom_mid` for a pitched body proxy. These mappings do not recreate their sounds or playing techniques.
 - **Chords spec:**
