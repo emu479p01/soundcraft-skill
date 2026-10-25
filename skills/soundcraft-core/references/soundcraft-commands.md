@@ -108,7 +108,7 @@ Source: `crates/dsp/src/plugins/synth.rs` (`SYNTH_PARAMS`, 19). Values clamped i
 
 ## drum_synth
 
-Source: `crates/dsp/src/plugins/drums.rs` (`kind_for`). General-MIDI-style map, 24-voice pool, closed hat (42/44) chokes open hat (46).
+Source: `crates/dsp/src/plugins/drums.rs` (`kind_for`). The map is GM-inspired but CUSTOM (it differs from the standard GM percussion map; see the final `drum_synth map:` line), 24-voice pool, closed hat (42/44) chokes open hat (46).
 
 | MIDI note | voice |
 |---|---|
@@ -124,7 +124,7 @@ Source: `crates/dsp/src/plugins/drums.rs` (`kind_for`). General-MIDI-style map, 
 | 49, 57 | crash |
 | 51, 59 | ride |
 
-Notes not listed (e.g. 52-56, 58, 60+) are not mapped in the source excerpt read; their behaviour is UNVERIFIED (looked in: drums.rs match summary). Note 37 (GM side stick) plays a clap here; there is no rimshot, cowbell or tambourine.
+Notes not listed (e.g. 52-56, 58, 60+) are not mapped in the source excerpt read; their behaviour is UNVERIFIED (looked in: drums.rs match summary). Note 37 (GM side stick) plays a clap here, and 44 plays a closed hat; there is no rimshot, shaker, tambourine, cowbell or perc voice. Notes 54, 56, 70 and 75 are unmapped (silent).
 
 Parameters (`DRUM_PARAMS`, 11): `level` -48..6 dB (-6); `kick_tune` -12..12 st (0); `kick_decay` 50..2000 ms (450); `snare_tune` -12..12 st (0); `snare_snappy` 0..100 % (60); `snare_decay` 50..1000 ms (220); `hat_decay` 20..500 ms (80); `open_hat_decay` 100..3000 ms (600); `tom_tune` -12..12 st (0); `tom_decay` 50..2000 ms (500); `cymbal_decay` 200..6000 ms (2000).
 
@@ -162,5 +162,22 @@ Engine safety: `Engine::execute` catches escaped panics and restores the documen
 - Hosted instruments (`clap:`, `vst3:`, `au:`) keep parameters in their own state; `mix.instrument_param` only works on built-ins (use `mix.insert_state` for raw state).
 - `batch` max 1000 commands. Pre-alpha: commands and ids can change.
 
-drum_synth map: GM
+drum_synth map: CUSTOM
+voice -> note (16 canonical voices; `unsupported` = no distinct sound in drum_synth, reject, do not fall back):
+- kick: 36
+- snare: 38
+- clap: 39
+- rim: unsupported (37 plays a clap)
+- hat: 42
+- open_hat: 46
+- pedal_hat: 44 (plays as closed hat)
+- ride: 51
+- crash: 49
+- tom_hi: 50
+- tom_mid: 47
+- tom_low: 45
+- shaker: unsupported (70 is unmapped, silent)
+- tambourine: unsupported (54 is unmapped, silent)
+- cowbell: unsupported (56 is unmapped, silent)
+- perc: unsupported (75 is unmapped, silent)
 mcp args: ["mcp"]
