@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "soundcraft": {"command": "soundcraft-cli", "args": ["mcp"]}
+  }
+}

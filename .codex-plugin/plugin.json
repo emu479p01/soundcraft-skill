@@ -1,0 +1,9 @@
+{
+  "name": "soundcraft-skills",
+  "version": "0.1.0",
+  "description": "Music production skills and offline MIDI tools for SoundCraft.",
+  "author": {"name": "Chaiyaporn Santangjai"},
+  "license": "MIT",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}
