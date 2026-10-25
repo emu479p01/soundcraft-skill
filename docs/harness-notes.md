@@ -171,6 +171,37 @@ On 2026-10-25, SoundCraft CLI 0.12.1 was exercised in three isolated headless se
 | Chords | Track “Pop Chords”, ID 1, `subtractive_synth` | 2,468,672 | 8.571 s | -22.733 | -13.602 | -13.601 |
 | Drums | Track “Pop Drums”, ID 1, `drum_synth` | 2,468,996 | 8.573 s | -27.256 | -7.266 | -7.077 |
 
-All three WAVs were nonzero in size, had finite measured peaks, and remained below 0 dBFS (no clipping). This is evidence for the real CLI's isolated import/instrument/bounce flow on this machine and version only. It does not test MCP transport, integration through a native agent harness, third-party hosting, listening quality, or cultural fidelity. Keep those explicitly untested. No software installation or harness configuration change was performed for this smoke run.
+All three WAVs were nonzero in size, had finite measured peaks, and remained below 0 dBFS (no clipping). This is evidence for the real CLI's isolated import/instrument/bounce flow on this machine and version only. At that time, MCP transport had not been tested; a separate transient stdio MCP smoke is recorded below. This does not test integration through a native agent harness, third-party hosting, listening quality, or cultural fidelity. Keep those explicitly untested. No software installation or harness configuration change was performed for this smoke run.
 
-The earlier Claude validator results and Codex parser probe above remain limited to the installed builds described there. They do not establish native Codex or Antigravity plugin coexistence or verified installation. Actual eight-skill temporary-home copies were tested separately as described above; native host loading of that package and real-user installation remain untested. The separate SoundCraft CLI smoke does not change those limits, and host import/loop handling of trailing-rest MIDI EOT boundaries has not been retested. `README_MISSING` is resolved by adding this repository README. `ICON_MISSING` remains a directory-submission warning; no icon-readiness claim is made.
+## Final correction verification (2026-10-25)
+
+Fresh controller checks after the final fix wave: 195 tests passed on Python
+3.12.14; all 8 skills passed `python -B tools/lint_skills.py`; Claude validation
+passed with the known `ICON_MISSING` warning. These are the fresh final-wave
+results. Earlier worker results on Python 3.14.7 (including source/targeted
+checks) are historical and distinct; they are not the controller's fresh run.
+
+A transient stdio MCP server smoke passed with SoundCraft CLI 0.12.1 and protocol
+`2024-11-05`. It used explicit workspace read and write roots. `list_commands`,
+`inspect_session`, MIDI import, instrument assignment, and an 8.0 s bounce all
+succeeded; measured peak was -13.136 dBFS and integrated loudness was -22.982
+LUFS. Evidence is `out/live-smoke-12e28s38/mcp-results.json` and
+`mcp-transcript.json`. The transient server was terminated after the check; no
+permanent MCP registration or configuration was changed. This proves a direct
+stdio MCP run only, not native harness loading/coexistence, third-party hosting,
+or listening quality.
+
+The same installed SoundCraft CLI 0.12.1 import probe showed that the writer's
+four-bar EOT boundary at tick 7680 was present, but the importer ignored silent
+EOT tails: sparse four-bar material intended for 8.0 s became a 294000-sample,
+6.125 s clip, and an all-rest file created no track. The CLI's actual
+`describe` output exposed `edit.trim_clip` parameters
+`{clip: id, start?: position, end?: position}`; edges move in the current edit
+mode. In an isolated verified Slip-mode test, extending the actual new clip
+with `end: {seconds: 8.0}` changed its end from 294000 to 384000 samples at
+48 kHz while all four notes remained. This behavior is verified only for that
+clip and mode. Other modes and hosts were not tested. Evidence:
+`duration-import-results.json` and `trim-results.json` under
+`out/live-smoke-12e28s38`.
+
+The earlier Claude validator results and Codex parser probe above remain limited to the installed builds described there. They do not establish native Codex or Antigravity plugin coexistence or verified installation. Actual eight-skill temporary-home copies were tested separately as described above; native host loading of that package and real-user installation remain untested. The isolated SoundCraft 0.12.1 probe establishes the EOT import limitation described above, not general host import/loop behavior. `README_MISSING` is resolved by adding this repository README. `ICON_MISSING` remains a directory-submission warning; no icon-readiness claim is made.

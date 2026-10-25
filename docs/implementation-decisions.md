@@ -1,6 +1,6 @@
 # Implementation decisions
 
-This record preserves the sixteen rulings supplied for Phase 1, including rationale and cost if wrong.
+This record preserves the seventeen rulings supplied for Phase 1, including rationale and cost if wrong.
 
 1. **T6 error paths:** T6 wraps `TheoryError`/`ValueError` from theory/rhythm/drums into `SpecError` with a field path. **Rationale:** spec §4 requires a path in messages. **Cost if wrong:** small error-plumbing refactor.
 2. **T9 install tests:** Use a fake repository fixture in a temporary directory, not the real repository. **Rationale:** installation must be testable before skills exist. **Cost if wrong:** none functionally.
@@ -18,3 +18,4 @@ This record preserves the sixteen rulings supplied for Phase 1, including ration
 14. **Final integration review:** Use gpt-6.1-sol high rather than automatically selecting a higher-price model. **Rationale:** prior task reviews and live engine evidence narrow remaining risk, and the latest user explicitly prioritizes economical model selection. **Cost if wrong:** a cross-task defect may require a later scoped correction.
 15. **Combined final review:** Combine Task 18 documentation review with the final whole-branch integration review in one reviewer dispatch, checking both requirement sets. **Rationale:** avoids a duplicate final-context review seat. **Cost if wrong:** documentation and integration receive one independent pass rather than two overlapping passes.
 16. **Requested phrase duration:** Preserve requested trailing-rest duration with an optional intended track-end tick carried from renderer to SMF EOT, at least final note-off; retain existing direct callers/defaults and do not lengthen sounding notes. **Rationale:** this restores requested phrase duration without adding composition features. **Cost if wrong:** a host may ignore EOT; document/test host behavior separately rather than invent fake notes.
+17. **SoundCraft 0.12.1 phrase import recovery:** Keep standards-correct MIDI phrase ends, and document SoundCraft 0.12.1's note-bound import behavior. Re-read imported clip bounds; for a newly imported clip in verified Slip mode, use the verified `edit.trim_clip` command to extend only a missing silent tail to the intended end, then inspect again. Other edit modes and intentionally all-rest tracks require an honest limitation/manual fallback, never fabricated notes or a claimed created clip. **Cost if wrong:** host/version-specific trim behavior needs re-verification; file data remains intact.
