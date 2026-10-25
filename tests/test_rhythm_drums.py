@@ -47,12 +47,33 @@ class RhythmTests(unittest.TestCase):
         self.assertEqual(len(chord_hits("pad", bar, **kw)), 1)
         self.assertEqual(len(chord_hits("block", bar, **kw)), 4)
         self.assertEqual(len(chord_hits("stabs", bar, **kw)), 2)
-        up = chord_hits("arp-up", bar, **kw)
+        up = chord_hits("arp-up", bar, note_count=3, **kw)
         self.assertEqual(len(up), 16)
         ud = chord_hits("arp-updown", bar, note_count=3, **kw)
         self.assertEqual([h[2] for h in ud[:6]], [0, 1, 2, 1, 0, 1])
         up3 = chord_hits("arp-up", bar, note_count=3, **kw)
         self.assertEqual([h[2] for h in up3[:4]], [0, 1, 2, 0])
+
+    def test_arp_note_count(self):
+        kw = dict(ppq=480, beats_per_bar=4, custom_steps=None)
+        h = chord_hits("arp-up", 1920, note_count=4, **kw)
+        self.assertEqual([x[2] for x in h[:5]], [0, 1, 2, 3, 0])
+        for nc in (None, 0):
+            with self.assertRaises(ValueError):
+                chord_hits("arp-up", 1920, note_count=nc, **kw)
+        self.assertEqual(len(chord_hits("pad", 1920, **kw)), 1)
+
+    def test_hits_capped_at_chord_end(self):
+        kw = dict(ppq=480, beats_per_bar=4, custom_steps=None, note_count=3)
+        for r, length in (("block", 720), ("stabs", 1080), ("arp-up", 500),
+                          ("arp-down", 1000)):
+            for start, dur, _, _ in chord_hits(r, length, **kw):
+                self.assertLessEqual(start + dur, length, r)
+
+    def test_parse_steps_empty(self):
+        with self.assertRaises(ValueError) as cm:
+            parse_steps(" | ", 4)
+        self.assertIn("pattern is empty", str(cm.exception))
 
     def test_chord_hits_custom(self):
         steps = parse_steps("x..." + "X..." + "g..." + "x...", 16)

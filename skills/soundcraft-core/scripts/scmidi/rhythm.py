@@ -18,6 +18,8 @@ def parse_steps(pattern: str, steps_per_bar: int) -> list[str]:
             raise ValueError(
                 f"invalid step character {c!r} at position {i} "
                 f"(allowed: x, X, g, . and bar separators)")
+    if not steps:
+        raise ValueError("pattern is empty")
     if steps_per_bar <= 0 or len(steps) % steps_per_bar != 0:
         raise ValueError(
             f"pattern has {len(steps)} steps, which is not a multiple of "
@@ -54,19 +56,24 @@ def humanize(notes: list[Note], amount: float, ppq: int, seed: int) -> list[Note
 
 
 def chord_hits(rhythm: str, length_ticks: int, ppq: int, beats_per_bar: float,
-               custom_steps: list[str] | None, note_count: int = 3
+               custom_steps: list[str] | None, note_count: int | None = None
                ) -> list[tuple[int, int, int | None, float]]:
     """Return (rel_start, duration, note_index or None for all notes, velocity_scale)."""
     if rhythm == "pad":
         return [(0, length_ticks, None, 1.0)]
     if rhythm == "block":
         dur = round(0.9 * ppq)
-        return [(t, dur, None, 1.0) for t in range(0, length_ticks, ppq)]
+        return [(t, min(dur, length_ticks - t), None, 1.0)
+                for t in range(0, length_ticks, ppq)]
     if rhythm == "stabs":
-        return [(t, ppq // 2, None, 1.0)
+        return [(t, min(ppq // 2, length_ticks - t), None, 1.0)
                 for t in (0, 2 * ppq) if t < length_ticks]
     if rhythm in ("arp-up", "arp-down", "arp-updown"):
-        n = max(1, note_count)
+        if note_count is None:
+            raise ValueError(f"arp rhythm {rhythm!r} requires note_count")
+        if note_count < 1:
+            raise ValueError(f"arp rhythm {rhythm!r} needs note_count >= 1, got {note_count}")
+        n = note_count
         up = list(range(n))
         if rhythm == "arp-up":
             cycle = up
@@ -75,7 +82,7 @@ def chord_hits(rhythm: str, length_ticks: int, ppq: int, beats_per_bar: float,
         else:
             cycle = up + up[-2:0:-1]
         step = ppq // 4
-        return [(t, step, cycle[k % len(cycle)], 1.0)
+        return [(t, min(step, length_ticks - t), cycle[k % len(cycle)], 1.0)
                 for k, t in enumerate(range(0, length_ticks, step))]
     if rhythm == "custom":
         if not custom_steps:
