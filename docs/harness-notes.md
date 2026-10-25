@@ -113,14 +113,33 @@ Unchanged configs create no backup. Before changed existing configs, backups use
 Codex TOML is append-only and preserves unrelated original bytes/newlines. This
 is a conservative text editor, not a general TOML parser: ambiguous existing MCP
 syntax may require manual reconciliation, even if semantically equivalent.
+Any triple-quote marker (`"""` or `'''`) is refused during preflight, including
+markers in comments or ordinary strings. Multiline TOML requires manual setup;
+this refusal occurs before any skill copies, backups, or config writes.
 Antigravity preserves unrelated JSON values, reformats only on change, and rejects
 duplicate keys. Filesystem failures may leave completed skill copies; installation
 is not a cross-file transaction. A config backup failure prevents that config edit.
 
+Changed configs are written to exclusive sibling temporary files, flushed, and
+atomically replaced after another identity/content and parent-containment check.
+Detected replacements, edits, newly appeared configs, and redirected parents are
+refused; the final replacement never writes through a substituted config symlink.
+POSIX commits use a directory descriptor and no-follow opens; Windows commits
+hold native directory handles denying ancestor renames until replacement finishes.
+Temporary siblings are removed on failure, and existing-config backups precede
+replacement. Atomic replacement creates a new file, so original file identity and
+custom permissions/metadata are not preserved (POSIX siblings start with mode 0600).
+These checks do not provide a filesystem transaction or serialize unrelated
+writers: another writer can still race the final content check and replacement.
+
 The supplied Python runtime is 3.12.14; an actual Python 3.9 runtime was not tested.
 Implementation and tests use standard-library APIs available in Python 3.9.
-Focused validation: 25 tests passed, including native temporary symlink tests
-(no skips), a simulated symlink privilege failure, and collision-proof backups.
-Final full-suite command, run once with that runtime:
-`python -m unittest discover -s tests -t .` -> 167 tests passed in 5.808 seconds,
-exit 0, no skips. This includes all 25 Task 9 tests.
+Original validation: 25 Task 9 tests and 167 full-suite tests passed with no skips.
+The Task 9 fix adds regressions for multiline conflicts, post-backup substitutions,
+late config/parent links, atomic replacement failure/cleanup, and new config paths.
+Fix-round focused validation: 33 installer/manifest tests passed in 0.510 seconds.
+The required full-suite command was run once after the fixes:
+`python -m unittest discover -s tests -t .` -> 175 tests passed in 6.074 seconds,
+exit 0, no skips. Detailed RED/GREEN evidence is in the Task 9 workspace report.
+Windows handle behavior is tested natively; the POSIX branch is source-reviewed
+but has not been executed on a POSIX host in this session.

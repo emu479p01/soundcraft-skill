@@ -6,11 +6,15 @@ conflicts: move or reconcile them explicitly, then rerun. No paths are deleted.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 import re
+import secrets
 import shutil
+import stat
 import sys
 
 
@@ -52,6 +56,10 @@ def _keys(text: str, path: Path) -> tuple[str, ...]:
 def _codex_content(original: bytes, path: Path) -> bytes:
     """Append only; never reinterpret or rewrite the caller's unrelated TOML."""
     text = original.decode('utf-8-sig')
+    # Triple-quote markers require lexical state this small editor cannot prove
+    # safe. Refuse conservatively, even inside comments or single-line strings.
+    if '"""' in text or "'''" in text:
+        raise _conflict(path, 'unsupported multiline TOML; configure soundcraft manually')
     section = ()
     server_sections = []
     server_values = []
@@ -75,7 +83,7 @@ def _codex_content(original: bytes, path: Path) -> bytes:
         assignment = re.match(r'([^=]+)=(.*)', stripped)
         if assignment:
             key_text, value = assignment.groups()
-            # Unrelated multiline values need not be parsed by an append-only editor.
+            # Unrecognized MCP keys must not hide an existing server.
             try:
                 key = _keys(key_text, path)
             except ValueError:
@@ -174,6 +182,96 @@ def _backup(path: Path, original: bytes) -> Path:
             candidate = base.with_name(base.name + '-' + str(suffix))
 
 
+def _config_identity(path: Path):
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        raise _conflict(path, 'soundcraft config is not a regular file')
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+
+
+def _check_config(path: Path, home: Path, identity, original: bytes) -> None:
+    _safe_parent(path, home)
+    if _config_identity(path) != identity:
+        raise _conflict(path, 'soundcraft config changed during installation')
+    if identity is not None:
+        # O_NOFOLLOW closes the stat/open link race on platforms providing it.
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+        with os.fdopen(descriptor, 'rb') as stream:
+            if stream.read() != original:
+                raise _conflict(path, 'soundcraft config changed during installation')
+
+
+@contextmanager
+def _config_directory(path: Path, home: Path):
+    """Anchor sibling creation/replacement against concurrent parent redirection."""
+    _safe_parent(path, home)
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        create = kernel.CreateFileW
+        create.argtypes = (wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                           wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE)
+        create.restype = wintypes.HANDLE
+        close = kernel.CloseHandle
+        close.argtypes = (wintypes.HANDLE,)
+        close.restype = wintypes.BOOL
+        handles = []
+        try:
+            # Deny directory deletion/rename while allowing child file updates.
+            parents = [path.parent, *path.parent.parents]
+            for parent in reversed(parents[:parents.index(home) + 1]):
+                handle = create(str(parent), 0x80000000, 3, None, 3, 0x02200000, None)
+                # GENERIC_READ, OPEN_EXISTING, BACKUP_SEMANTICS | OPEN_REPARSE_POINT.
+                if handle == wintypes.HANDLE(-1).value:
+                    raise ctypes.WinError(ctypes.get_last_error())
+                handles.append(handle)
+            _safe_parent(path, home)
+            yield None
+        finally:
+            for handle in reversed(handles):
+                close(handle)
+    else:
+        descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            _safe_parent(path, home)
+            if not os.path.samestat(os.fstat(descriptor), path.parent.stat()):
+                raise _conflict(path, 'destination parent changed during installation')
+            yield descriptor
+        finally:
+            os.close(descriptor)
+
+
+def _replace_config(path: Path, home: Path, identity, original: bytes, updated: bytes) -> None:
+    _check_config(path, home, identity, original)
+    with _config_directory(path, home) as directory:
+        _check_config(path, home, identity, original)
+        name = '.' + path.name + '.tmp-' + secrets.token_hex(16)
+        temporary = path.with_name(name)
+        location = temporary if directory is None else name
+        options = {} if directory is None else {'dir_fd': directory}
+        descriptor = os.open(location, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, **options)
+        try:
+            with os.fdopen(descriptor, 'wb') as stream:
+                stream.write(updated)
+                stream.flush()
+                os.fsync(stream.fileno())
+            _check_config(path, home, identity, original)
+            if directory is None:
+                os.replace(temporary, path)
+            else:
+                os.replace(name, path.name, src_dir_fd=directory, dst_dir_fd=directory)
+        finally:
+            try:
+                os.unlink(location, **options)
+            except FileNotFoundError:
+                pass
+
+
 def install(targets: list[str], home: Path, repo: Path, dry_run: bool = False,
             link: bool = False) -> list[str]:
     """Plan all targets before writes; return actions. Conflicts raise ValueError.
@@ -206,12 +304,11 @@ def install(targets: list[str], home: Path, repo: Path, dry_run: bool = False,
             config = home / '.gemini/config/mcp_config.json'
             merge = _antigravity_content
         _safe_parent(config, home)
-        if config.is_symlink() or (config.exists() and not config.is_file()):
-            raise _conflict(config, 'soundcraft config is not a regular file')
-        original = config.read_bytes() if config.exists() else b''
+        identity = _config_identity(config)
+        original = config.read_bytes() if identity is not None else b''
         updated = merge(original, config)
         if updated != original:
-            configs.append((config, original, updated))
+            configs.append((config, identity, original, updated))
         else:
             actions.append(f"Unchanged config: {config}")
         for skill in skills:
@@ -244,18 +341,17 @@ def install(targets: list[str], home: Path, repo: Path, dry_run: bool = False,
                     raise _conflict(dest, f'skill {skill.name} appeared during symlink creation') from exc
                 actions.append(f"Warning: symlink failed ({exc}); falling back to copy: {dest}")
         shutil.copytree(skill, dest)
-    for config, original, updated in configs:
+    for config, identity, original, updated in configs:
         actions.append(f"{prefix}merge soundcraft MCP server into {config}")
         if dry_run:
             if config.exists():
                 actions.append(f"Would back up {config} before editing")
             continue
         config.parent.mkdir(parents=True, exist_ok=True)
-        if config.exists():
-            if config.read_bytes() != original:
-                raise _conflict(config, 'soundcraft config changed during installation')
+        _check_config(config, home, identity, original)
+        if identity is not None:
             actions.append(f"Backup: {_backup(config, original)}")
-        config.write_bytes(updated)
+        _replace_config(config, home, identity, original, updated)
     return actions
 
 

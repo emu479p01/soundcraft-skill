@@ -3,6 +3,7 @@ from contextlib import redirect_stdout
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -140,6 +141,21 @@ class InstallTests(unittest.TestCase):
             self.run_install()
         self.assertEqual(self.snapshot(), before)
 
+    def test_multiline_toml_cannot_hide_soundcraft_before_any_writes(self):
+        for quote in ('"""', "'''"):
+            for definition in (
+                'mcp_servers.soundcraft.command = "custom"',
+                'mcp_servers = { soundcraft = { command = "custom" } }',
+            ):
+                with self.subTest(quote=quote, definition=definition):
+                    content = 'model_instructions = ' + quote + '\n[example]\n' + quote + '\n' + definition + '\n'
+                    self.write(self.toml, content)
+                    before = self.snapshot()
+                    for dry_run in (False, True):
+                        with self.assertRaisesRegex(ValueError, '(?i)conflict.*(multiline|soundcraft)'):
+                            self.run_install(['antigravity', 'codex'], dry_run=dry_run)
+                        self.assertEqual(self.snapshot(), before)
+
     def test_link_fallback_is_safe_and_idempotent(self):
         with patch.object(Path, 'symlink_to', side_effect=OSError('Privilege unavailable')):
             lines = self.run_install(link=True)
@@ -206,6 +222,148 @@ class InstallTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '(?i)(link|redirected)'):
             self.run_install()
         self.assertFalse(self.home.exists())
+
+    def test_post_backup_config_symlink_cannot_redirect_write(self):
+        for target, config, original in (
+            ('codex', self.toml, b'# Original\n'),
+            ('antigravity', self.json, b'{"theme":"original"}\n'),
+        ):
+            with self.subTest(target=target):
+                self.write(config, original.decode())
+                outside = self.root / ('caller-' + target)
+                outside.write_bytes(original)
+                backup = self.installer._backup
+
+                def substitute(path, data):
+                    result = backup(path, data)
+                    path.unlink()
+                    try:
+                        path.symlink_to(outside)
+                    except OSError as exc:
+                        self.skipTest('Native symlinks unavailable: ' + str(exc))
+                    return result
+
+                with patch.object(self.installer, '_backup', substitute):
+                    with self.assertRaisesRegex(ValueError, '(?i)(conflict|changed|link)'):
+                        self.run_install([target])
+                self.assertEqual(outside.read_bytes(), original)
+                self.assertTrue(config.is_symlink())
+                self.assertEqual(next(config.parent.glob(config.name + '.bak-*')).read_bytes(), original)
+
+    def test_post_backup_parent_redirection_cannot_write_outside_home(self):
+        self.write(self.toml, '# Original\n')
+        outside = self.root / 'caller directory'
+        outside.mkdir()
+        caller_config = outside / self.toml.name
+        caller_config.write_bytes(b'# Original\n')
+        backup = self.installer._backup
+        moved = self.root / 'original codex directory'
+
+        def substitute(path, data):
+            result = backup(path, data)
+            path.parent.rename(moved)
+            self.make_link(path.parent, outside)
+            return result
+
+        with patch.object(self.installer, '_backup', substitute):
+            with self.assertRaisesRegex(ValueError, '(?i)(conflict|redirect|parent)'):
+                self.run_install()
+        self.assertEqual(caller_config.read_bytes(), b'# Original\n')
+        self.assertEqual(sorted(p.name for p in outside.iterdir()), ['config.toml'])
+        self.assertEqual((moved / self.toml.name).read_bytes(), b'# Original\n')
+        self.assertEqual(next(moved.glob('config.toml.bak-*')).read_bytes(), b'# Original\n')
+
+    def test_post_backup_replaced_or_modified_config_is_preserved(self):
+        for change in ('identity', 'content'):
+            with self.subTest(change=change):
+                self.write(self.toml, '# Original\n')
+                backup = self.installer._backup
+
+                def substitute(path, data):
+                    result = backup(path, data)
+                    if change == 'identity':
+                        replacement = self.root / 'replacement'
+                        replacement.write_bytes(data)
+                        replacement.replace(path)
+                    else:
+                        path.write_bytes(b'# Concurrent edit\n')
+                    return result
+
+                with patch.object(self.installer, '_backup', substitute):
+                    with self.assertRaisesRegex(ValueError, '(?i)(conflict|changed)'):
+                        self.run_install()
+                expected = b'# Original\n' if change == 'identity' else b'# Concurrent edit\n'
+                self.assertEqual(self.toml.read_bytes(), expected)
+
+    def test_config_appearing_after_preflight_is_preserved(self):
+        copytree = self.installer.shutil.copytree
+
+        def copy_then_create(*args, **kwargs):
+            result = copytree(*args, **kwargs)
+            self.write(self.toml, '')
+            return result
+
+        with patch.object(self.installer.shutil, 'copytree', copy_then_create):
+            with self.assertRaisesRegex(ValueError, '(?i)(conflict|changed|appeared)'):
+                self.run_install()
+        self.assertEqual(self.toml.read_bytes(), b'')
+        self.assertEqual(list(self.toml.parent.glob('config.toml.bak-*')), [])
+
+    def test_atomic_replace_failure_preserves_config_and_removes_temporary(self):
+        self.write(self.toml, '# Original\n')
+        with patch('os.replace', side_effect=OSError('Replace unavailable')):
+            with self.assertRaisesRegex(OSError, 'Replace unavailable'):
+                self.run_install()
+        self.assertEqual(self.toml.read_bytes(), b'# Original\n')
+        self.assertEqual(next(self.toml.parent.glob('config.toml.bak-*')).read_bytes(), b'# Original\n')
+        self.assertEqual(list(self.toml.parent.glob('.*.tmp-*')), [])
+
+    def test_last_moment_config_link_is_replaced_without_following_it(self):
+        self.write(self.toml, '# Original\n')
+        outside = self.root / 'caller at replace'
+        outside.write_bytes(b'# Caller\n')
+        replace = os.replace
+
+        def substitute(source, destination, **kwargs):
+            self.toml.unlink()
+            try:
+                self.toml.symlink_to(outside)
+            except OSError as exc:
+                self.skipTest('Native symlinks unavailable: ' + str(exc))
+            return replace(source, destination, **kwargs)
+
+        with patch('os.replace', substitute):
+            self.run_install()
+        self.assertEqual(outside.read_bytes(), b'# Caller\n')
+        self.assertFalse(self.toml.is_symlink())
+        self.assertIn('[mcp_servers.soundcraft]', self.toml.read_text())
+
+    def test_last_moment_parent_redirection_cannot_redirect_replace(self):
+        self.write(self.toml, '# Original\n')
+        outside = self.root / 'caller at parent replace'
+        outside.mkdir()
+        caller = outside / self.toml.name
+        caller.write_bytes(b'# Caller\n')
+        moved = self.root / 'moved at replace'
+        replace = os.replace
+
+        def substitute(source, destination, **kwargs):
+            try:
+                self.toml.parent.rename(moved)
+            except PermissionError:
+                # Windows directory handles deny renames during the commit.
+                if os.name != 'nt':
+                    raise
+            else:
+                self.make_link(self.toml.parent, outside)
+            return replace(source, destination, **kwargs)
+
+        with patch('os.replace', substitute):
+            self.run_install()
+        self.assertEqual(caller.read_bytes(), b'# Caller\n')
+        actual = moved / self.toml.name if moved.exists() else self.toml
+        self.assertIn('[mcp_servers.soundcraft]', actual.read_text())
+        self.assertEqual(list(actual.parent.glob('.*.tmp-*')), [])
 
     def test_symlinked_config_is_not_followed(self):
         outside = self.root / 'caller config'
