@@ -64,6 +64,7 @@ soundcraft-skill/
 ├── .codex-plugin/plugin.json                        # Codex
 ├── .agents/plugins/marketplace.json                 # Codex marketplace
 ├── plugin.json, mcp_config.json                     # Antigravity
+├── LICENSE, CREDITS.md                               # MIT (Chaiyaporn Santangjai) + เครดิต
 ├── install.py                                       # fallback installer
 ├── tests/
 └── README.md                                        # ไทย + อังกฤษ
@@ -121,15 +122,19 @@ soundcraft-skill/
   `m7b5`, `dim7`, `9`, `maj9`, `m9`, `11`, `m11`, `13`, `maj13`, `add9`, `add11`,
   alterations (`b5 #5 b9 #9 #11 b13`), slash chord (`G/B`)
 - เลขโรมันเมื่อมี `key`: `i - VI - III - VII`, `ii7 - V7 - Imaj7`, รองรับ `bVII`, `V/V`
-- `voicing`: `close` | `open` | `drop2` | `spread`; voice leading อัตโนมัติ (เลือก inversion ที่ระยะรวมน้อยสุด) ปิดได้ด้วย `"voice_leading": false`
+- `voicing`: `close` | `open` | `drop2` | `spread` | `rootless` (3-5-7-9 ช่วง MIDI ~56–74 ใช้เมื่อมีเบสเล่น root);
+  `range: [low, high]` บังคับช่วงโน้ตตามเครื่องดนตรี (ค่าเริ่ม `[48, 79]`); voice leading อัตโนมัติ (เลือก inversion ที่ระยะรวมน้อยสุด) ปิดได้ด้วย `"voice_leading": false`
 - `rhythm`: `block` | `pad` | `stabs` | `arp-up` | `arp-down` | `arp-updown` | `custom` (+ `"steps"` string)
 - `bass_note`: `true` เพิ่ม root ต่ำ 1 octave (ค่าเริ่ม `false`)
+- `strum_ms`: หน่วงโน้ตแต่ละตัวในคอร์ดจากล่างขึ้นบน (ค่าเริ่ม 0; แนะนำ ~15 สำหรับเปียโน/กีตาร์)
 
 **Drums track**
 - step chars: `x` ปกติ (vel 100), `X` accent (vel 120), `g` ghost (vel 45), `.` rest
 - ความยาว string = `steps` ต่อห้อง (ค่าเริ่ม 16); ยาวกว่า 1 ห้องได้ถ้าเป็นจำนวนเท่าของ `steps`
 - เสียง: `kick snare clap rim hat open_hat pedal_hat ride crash tom_hi tom_mid tom_low shaker tambourine cowbell perc`
 - `swing` 0.5–0.75 (เลื่อน step คี่), `humanize` 0–1 (สุ่ม timing ±/velocity ด้วย seed คงที่ — `"seed"` กำหนดได้)
+- `offset_ms`: เลื่อนเสียงบางชิ้นทั้งแพทเทิร์น เช่น `{"snare": 25}` (snare ลากหลังจังหวะสำหรับ lo-fi/hip-hop)
+- `velocity`: override ค่า `x/X/g` ต่อเสียงได้ เช่น `{"hat": {"x": 85, "g": 40}}`
 - `fill.every` N ห้อง แทนที่ห้องสุดท้ายของทุก N ห้องเฉพาะเสียงที่ระบุ
 - `drum_map`: `gm` | `soundcraft` | object `{"kick": 36, ...}`
 
@@ -139,6 +144,56 @@ soundcraft-skill/
 - stdout: สรุปข้อความรายห้อง (`Bar 1: Dm9 = D3 A3 C4 E4 F4`) + path ไฟล์
 - `--json` ให้สรุปเป็น JSON
 - Exit code: 0 สำเร็จ, 2 spec ไม่ถูกต้อง (ข้อความระบุ field + ค่า + สิ่งที่ยอมรับ)
+- Validate ก่อนเขียนเสมอ: pitch 0–127, velocity 1–127, start ≥ 0, duration > 0 — ไม่มีการเขียน output ที่ยังไม่ผ่าน validate
+
+## 4.5 Thinking Framework (วิธีคิดที่ทุก skill ใช้ร่วมกัน)
+
+ดัดแปลงแนวคิดจาก repo อ้างอิง (ดู §8) ให้เข้ากับ SoundCraft — เขียนใหม่ด้วยภาษาของเราเองทั้งหมด
+
+**A. โครง SKILL.md มาตรฐาน** — ทุก skill มีหัวข้อเดียวกัน:
+`When to use` → `Workflow` → `Style table` → `Spec pattern` → `Checks` → `Limits` → `Related skills`
+
+**B. Brief → Parameters** (ใช้ใน chords/drums) — แตกคำขอเป็น
+key/scale, bpm, bars, genre/feel, mood, density (sparse↔busy), energy arc, instrument/plugin เป้าหมาย
+- ค่าที่ขาดให้เติมจาก Style table ของแนวนั้น แล้ว **บอก user ว่าเลือกอะไรให้**
+- ถามเฉพาะเมื่อจำเป็นจริง (เช่นไม่รู้แนว และไม่มีบริบทเลย) ไม่เกิน 1–2 คำถาม แบบยืนยัน:
+  "จะใช้ D minor 90 BPM สไตล์ lo-fi นะครับ โอเคไหม?" แทนคำถามปลายเปิด
+
+**C. Preflight → Read state → Act → Re-read** (ทุกครั้งที่แตะ SoundCraft)
+1. Preflight: MCP ตอบไหม (`list_commands`) — ล้ม = หยุดแล้วส่งไป `soundcraft-setup` / fallback `.mid`
+2. Read state: `inspect_session` เอาชื่อ/id track จริง — **ห้ามเดา id**
+3. Plugin: ค้นชื่อที่ตรงเป๊ะก่อนโหลด (ชื่อผิดตัวพิมพ์ = ล้ม)
+4. ห้ามเขียนทับ track/clip ที่มีอยู่ เว้นแต่ user สั่ง — ค่าเริ่มคือสร้าง track ใหม่
+5. หลังแก้ทุกครั้ง: `inspect_session` ยืนยันผล
+
+**D. Generate → Measure → Adjust (สูงสุด 3 รอบ)**
+- Measure ระดับ spec: อ่านสรุปโน้ตจาก `make_midi.py` ตรวจกับเจตนา (คอร์ดถูก, ช่วงเสียงอยู่ใน range, kick ตรงจังหวะ)
+- Measure ระดับเสียง (ถ้ามี MCP): `bounce_mix` → มีเสียง (peak > -inf), ไม่ clip (peak ≤ 0 dBFS)
+- ครบ 3 รอบแล้วยังไม่ผ่าน → รายงานสิ่งที่ติดและถาม user
+- ผลแบ่ง **FAIL** (หยุด) / **WARN** (แจ้งแต่ไปต่อ)
+
+**E. Error recovery classes** (ใน `soundcraft-commands.md`)
+| Class | ตัวอย่าง | การแก้ |
+|---|---|---|
+| แก้ request | spec ผิด, ชื่อคำสั่ง/plugin ผิด | แก้แล้วรันใหม่ / `list_commands` หาคำสั่งใกล้เคียง |
+| แก้ session state | track ไม่มี, transport กำลังเล่น | อ่าน state ใหม่ / หยุด transport ก่อนแก้โครงสร้าง |
+| แก้ environment | SoundCraft ไม่เปิด, MCP ไม่ต่อ, ไฟล์เขียนไม่ได้ | ส่งไป setup / fallback `.mid` |
+
+**F. ความรู้ดนตรีที่ฝังใน references**
+- *Harmony* (`chords`): ขยายคอร์ดตามแนว (m→m9, maj→maj9, dom→9/13 สำหรับ R&B/jazz/neo-soul),
+  rootless voicing เมื่อมีเบส, modal interchange (♭III ♭VI ♭VII iv), tritone sub, passing diminished;
+  โหมด **reharmonize** — "ทำให้แจ๊สขึ้น/เศร้าขึ้น" ต้อง **ประกาศกลยุทธ์ 1 อย่างก่อน** แล้วค่อยแก้
+- *Rhythm* (`drums`): velocity 3 ระดับ (accent/ปกติ/ghost), swing เฉพาะ off-beat 16th,
+  snare ลากหลัง (lo-fi/hip-hop) vs ตรงเป๊ะ (house/techno), fill ทุก 4 หรือ 8 ห้อง,
+  humanize แบบเบาเป็นค่าเริ่ม ("humanize มากเกินทำให้แนวที่ต้องแน่นเละ")
+- *Style table* ต่อแนว: BPM range, feel, progression/groove ตัวอย่าง, instrument แนะนำ (built-in + plugin ฟรี)
+
+**G. User Corpus** (`plugins`)
+- ผลสแกน plugin เก็บที่ `~/.soundcraft-skills/plugins.json` (ชื่อ, format, path, หมวด: synth/drum/eq/comp/reverb/…)
+- `chords`/`drums` อ่าน corpus เพื่อแนะนำ **plugin ที่ user มีจริง** ก่อน built-in หรือของฟรีที่ยังไม่ได้ติดตั้ง
+- อ่านช่วงค่า parameter จาก MCP ก่อนตั้งค่าเสมอ; ลำดับ FX มาตรฐาน: EQ → comp → saturation → modulation → delay → reverb
+
+**H. การรายงานผล** — ภาษาคนสั้น ๆ: ทำอะไรไป, เลือกค่าอะไรให้และเพราะอะไร, ไฟล์อยู่ไหน, ขั้นต่อไปที่แนะนำ
 
 ## 5. Skills
 
@@ -189,7 +244,26 @@ groove + BPM ทั่วไป ในรูป spec ตัวอย่างท
 - Integration (ถ้ามี SoundCraft): `soundcraft-cli run --cmd ... --bounce` จาก smoke test
 - Codex/Antigravity: ตรวจโครงสร้างไฟล์ตาม docs; การติดตั้งจริงให้ user ทดสอบ
 
-## 8. แผนต้นทุน (การ implement)
+## 8. แหล่งอ้างอิงและ License
+
+- โปรเจกต์นี้: MIT — Copyright (c) 2026 Chaiyaporn Santangjai (`LICENSE`)
+- `CREDITS.md` ระบุทุก repo ที่ได้แนวคิด พร้อม license
+- นโยบาย: เขียนเนื้อหาใหม่ด้วยภาษาของเราเอง ไม่ copy ข้อความยาว; ถ้าดัดแปลงข้อความจาก repo MIT ให้คง copyright notice ใน `CREDITS.md`
+
+| Repo | License | สิ่งที่นำมา |
+|---|---|---|
+| Goldwaterfung/Stratawright | MIT | preflight/read-state, exact-name lookup, error recovery classes, analyze→fix→re-analyze |
+| Korben00/ableton-producer-skills | MIT | โครง SKILL.md, brief→parameters, validate-before-write, harmony/rhythm/humanize rules |
+| bitwize-music-studio/claude-ai-music-skills | CC0-1.0 | gated FAIL/WARN, confirm-style questions, cross-harness manifest ตัวอย่าง, เป้า LUFS (v2) |
+| rtmalikian/tech-house-production-skills | ไม่มีไฟล์ LICENSE | แนวคิดเท่านั้น: generate→measure→adjust ≤3 รอบ, ตัวเลข tech house (v2) |
+| glincker/ableton-skills | MIT | voicing ตามช่วงเครื่องดนตรี, groove-builder |
+| kennethreitz/pytheory | MIT | อ้างอิง logic ทฤษฎี (ตรวจผล parser) |
+| dreamrec/LivePilot | BSL-1.1 | แนวคิดเท่านั้น: User Corpus |
+
+**Backlog ความรู้สำหรับ v2:** gain staging/LUFS targets/EQ-comp tables (tech-house, bitwize) → mix-assist;
+arrangement templates + "ทุก 8 ห้องต้องมีอะไรเปลี่ยน" → song-sketch; bassline/topline rules (Korben) → bassline/melody
+
+## 9. แผนต้นทุน (การ implement)
 
 งานย่อยที่ไม่ต้องตัดสินใจเชิงออกแบบ (คลัง genres/grooves, free-plugins, tests, README, manifests)
 มอบให้ subagent ราคาถูก (Sonnet 5.5 / Haiku 5.5 / GPT ผ่าน T3) — งาน core (theory, midi_writer, spec)
