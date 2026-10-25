@@ -4,7 +4,7 @@ The BPM ranges, swings and patterns below are adaptable sketches, not transcript
 
 ## pop
 
-**BPM:** 100–125; example 112. **Swing:** 0.50, straight eighths. **Main:** kick on 1 and 3, snare on 2 and 4, even hats. **Variation:** add a kick pickup late in the bar. **Fill:** a one-bar snare/tom lift at bar 4; keep room for the vocal.
+**BPM:** 100–125; example 112. **Swing:** 0.50, straight eighths. **Main:** quarter-note kick on all four beats, snare on 2 and 4, even hats. **Variation:** add a kick pickup late in the bar. **Fill:** a one-bar snare/tom lift at bar 4; keep room for the vocal.
 
 ```json
 {
@@ -69,7 +69,7 @@ The BPM ranges, swings and patterns below are adaptable sketches, not transcript
 
 ## trap
 
-**BPM:** 130–160; example 144 (often felt in half-time). **Swing:** 0.50. **Main:** half-time snare, sparse kick and rapid but controlled 16th hats. **Variation:** use a few 32nd steps only when a denser hat phrase is wanted. **Fill:** a short hat roll; the built-in map supports hats but not shaker.
+**BPM:** 130–160; example 144 (often felt in half-time). **Swing:** 0.50. **Main:** half-time snare, sparse kick and steady eighth-note hats. **Variation:** use a few 32nd steps only when a denser hat phrase is wanted. **Fill:** a short hat roll; the built-in map supports hats but not shaker.
 
 ```json
 {
@@ -95,7 +95,7 @@ The BPM ranges, swings and patterns below are adaptable sketches, not transcript
 
 ## house
 
-**BPM:** 118–130; example 124. **Swing:** 0.50. **Main:** four-on-the-floor kick, backbeat and even closed hats. **Variation:** open hat on offbeats. **Fill:** a tight snare/clap lift. Keep the grid precise; use a confirmed GM-compatible plugin and `gm` map if a clap is desired because built-in clap differs from a GM side stick but is supported.
+**BPM:** 118–130; example 124. **Swing:** 0.50. **Main:** four-on-the-floor kick, backbeat and even closed hats. **Variation:** open hat on offbeats. **Fill:** a tight snare/clap lift. Keep the grid precise; the built-in `drum_synth` supports clap on the `soundcraft` map (note 39). Use a confirmed GM-compatible plugin and `gm` map only for voices unavailable on the built-in map.
 
 ```json
 {
