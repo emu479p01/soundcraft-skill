@@ -62,6 +62,35 @@ class MakeMidiCliTests(unittest.TestCase):
         self.assertIn("tracks[0].voiceing", result.stderr)
         self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), ["bad.json"])
 
+    def test_cli_extreme_numbers_exit2_with_field_path(self):
+        cases = [
+            ({"tracks": [{"type": "chords", "progression": [
+                {"chord": "C", "beats": 1e308}]}]},
+             "tracks[0].progression[0].beats"),
+            ({"tracks": [{"type": "chords", "progression": ["C"],
+                           "chord_length": "9" * 309 + "beats"}]},
+             "tracks[0].chord_length"),
+            ({"bpm": 10 ** 400, "tracks": [
+                {"type": "chords", "progression": ["C"]}]}, "bpm"),
+        ]
+        for raw, path in cases:
+            with self.subTest(path=path):
+                result = _cli("-", "--out", str(self.tmp / "invalid.mid"),
+                              stdin=json.dumps(raw))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(path, result.stderr)
+                self.assertFalse((self.tmp / "invalid.mid").exists())
+
+    def test_cli_encodes_all_rest_custom_chord_track(self):
+        out = self.tmp / "silent.mid"
+        raw = {"tracks": [{"type": "chords", "progression": ["C"],
+                           "rhythm": "custom", "steps": "." * 16}]}
+        result = _cli("-", "--out", str(out), stdin=json.dumps(raw))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(out.is_file())
+        song = read_smf(out)
+        self.assertFalse(any(track.notes for track in song.tracks))
+
     def test_cli_invalid_json_exit2(self):
         result = _cli("-", "--out", str(self.tmp / "x.mid"), stdin="{not json")
         self.assertEqual(result.returncode, 2)

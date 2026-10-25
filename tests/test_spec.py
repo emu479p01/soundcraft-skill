@@ -195,6 +195,13 @@ class SpecTests(unittest.TestCase):
         self.assertEqual({n.pitch for n in song.tracks[0].notes}, {35})
         self.assertSpecError({"tracks": [_drums(drum_map={"kick": 300})]},
                              "tracks[0].drum_map")
+        self.assertSpecError({"tracks": [_drums(drum_map={"kik": 36})]},
+                             "tracks[0].drum_map.kik", "did you mean 'kick'")
+
+    def test_custom_chord_rhythm_can_be_all_rests(self):
+        song, _ = _run({"tracks": [_chords(rhythm="custom", steps="." * 16)]})
+        self.assertEqual(song.tracks[0].notes, [])
+        self.assertTrue(encode_smf(song).startswith(b"MThd"))
 
     def test_chord_lengths(self):
         song, _ = _run({"tracks": [_chords(
@@ -208,6 +215,20 @@ class SpecTests(unittest.TestCase):
         self.assertEqual({n.duration for n in song.tracks[0].notes}, {1440})
         self.assertSpecError({"tracks": [_chords(chord_length="2 weeks")]},
                              "tracks[0].chord_length", "1bar")
+
+    def test_extreme_lengths_and_numeric_fields_are_spec_errors(self):
+        cases = [
+            ({"tracks": [_chords(progression=[{"chord": "C", "beats": 1e308}])]},
+             "tracks[0].progression[0].beats"),
+            ({"tracks": [_chords(chord_length="" + "9" * 309 + "beats")]},
+             "tracks[0].chord_length"),
+            ({"bpm": 10 ** 400, "tracks": [_chords()]}, "bpm"),
+        ]
+        for raw, path in cases:
+            with self.subTest(path=path):
+                with self.assertRaises(SpecError) as cm:
+                    validate_spec(raw)
+                self.assertEqual(cm.exception.path, path, str(cm.exception))
 
     def test_repeat_and_summary_bars(self):
         song, lines = _run({"tracks": [_chords(progression="C | G", repeat=2)]})

@@ -25,6 +25,7 @@ TRACK_TYPES = ("chords", "drums")
 DRUM_STEPS = (4, 8, 12, 16, 24, 32)
 DENOMINATORS = (2, 4, 8, 16)
 CUSTOM_STEPS = 16
+MAX_MIDI_DELTA = (1 << 28) - 1
 MAX_TRACKS = 16
 MAX_CHORD_TRACKS = 15  # MIDI channels 0-15 minus the drum channel 9
 _LENGTH_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(bars?|beats?)\s*$")
@@ -61,8 +62,11 @@ def _is_int(value: Any) -> bool:
 
 
 def _is_num(value: Any) -> bool:
-    return (isinstance(value, (int, float)) and not isinstance(value, bool)
-            and math.isfinite(value))
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    # Integers are finite by definition; math.isfinite converts them to float
+    # and can itself overflow for otherwise straightforward out-of-range input.
+    return isinstance(value, int) or math.isfinite(value)
 
 
 def _int(obj: dict, key: str, path: str, default: Any,
@@ -114,14 +118,25 @@ def _steps(text: Any, steps_per_bar: int, path: str) -> list[str]:
 def _beats(value: Any, path: str, beats_per_bar: float, unit: Optional[str] = None) -> float:
     """A length in quarter-note beats. unit forces a bare number to "beats" or "bars"."""
     beats: Optional[float] = None
-    if _is_num(value) and value > 0:
-        beats = value * beats_per_bar if unit == "bars" else float(value)
-    elif isinstance(value, str) and unit is None:
-        m = _LENGTH_RE.match(value)
-        if m and float(m.group(1)) > 0:
-            n = float(m.group(1))
-            beats = n * beats_per_bar if m.group(2).startswith("bar") else n
-    if beats is None or round(beats * PPQ) < 1:
+    try:
+        if _is_num(value) and value > 0:
+            beats = value * beats_per_bar if unit == "bars" else float(value)
+        elif isinstance(value, str) and unit is None:
+            m = _LENGTH_RE.match(value)
+            if m:
+                n = float(m.group(1))
+                if math.isfinite(n) and n > 0:
+                    beats = n * beats_per_bar if m.group(2).startswith("bar") else n
+        if beats is not None:
+            ticks = beats * PPQ
+            if (not math.isfinite(beats) or not math.isfinite(ticks)
+                    or ticks > MAX_MIDI_DELTA):
+                beats = None
+            elif round(ticks) < 1:
+                beats = None
+    except OverflowError:
+        beats = None
+    if beats is None:
         raise _bad(path, value, "a positive number" if unit else _LENGTH_ACCEPTED)
     return beats
 
@@ -194,8 +209,6 @@ def _chord_track(track: dict, path: str, key: Optional[Key], bpb: float) -> dict
         if len(parsed) != CUSTOM_STEPS:
             raise SpecError(steps_path, f"custom rhythm needs exactly {CUSTOM_STEPS} steps "
                                         f"(one bar), got {len(parsed)}")
-        if all(c == "." for c in parsed):
-            raise SpecError(steps_path, "custom rhythm has no hits (only '.' rests)")
     elif steps is not None:
         raise SpecError(steps_path, f"is only used with rhythm 'custom' "
                                     f"(rhythm is {out['rhythm']!r})")
@@ -262,6 +275,8 @@ def _drum_track(track: dict, path: str) -> dict:
     out["fill"] = fill
 
     drum_map = track.get("drum_map", "gm")
+    if isinstance(drum_map, dict):
+        _check_fields(drum_map, VOICES, _join(path, "drum_map"))
     try:
         resolve_drum_map(drum_map)
     except ValueError as e:
