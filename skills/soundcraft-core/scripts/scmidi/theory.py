@@ -1,4 +1,4 @@
-"""Music theory helpers: notes, chord symbols, keys and roman numerals.
+"""Music theory helpers: notes, chord symbols, keys, roman numerals and voicings.
 
 All pitch classes are integers 0-11 with C = 0. MIDI note 60 is C4 (middle C).
 Every error raised here is a TheoryError whose message names the offending
@@ -12,6 +12,7 @@ from typing import Optional
 
 __all__ = [
     "QUALITIES",
+    "VOICINGS",
     "Chord",
     "Key",
     "TheoryError",
@@ -21,6 +22,7 @@ __all__ = [
     "parse_note",
     "parse_roman",
     "pitch_name",
+    "voice_chord",
 ]
 
 
@@ -324,3 +326,121 @@ def parse_chord_token(token: str, key: Optional[Key]) -> Chord:
             )
         return parse_roman(token, key)
     return parse_chord(token)
+
+
+VOICINGS = ("close", "open", "drop2", "spread", "rootless")
+_DEFAULT_RANGE = (48, 79)
+_ROOTLESS_RANGE = (56, 74)
+
+
+def _stack(base: int, intervals: tuple[int, ...]) -> list[int]:
+    return [base + i for i in intervals]
+
+
+def _shape_voicing(chord: Chord, voicing: str, base: int) -> list[int]:
+    """Algorithm steps 2-6: the voicing before it is fitted to the range."""
+    close = _stack(base, chord.intervals)
+    if voicing == "close":
+        return close
+    if voicing == "open":
+        if len(close) >= 2:
+            close[1] += 12
+        return sorted(close)
+    if voicing == "drop2":
+        if len(close) >= 4:
+            close[-2] -= 12
+        return sorted(close)
+    if voicing == "spread":
+        notes = [base - 12]
+        for interval in chord.intervals[1:]:
+            floor = notes[-1] + 5
+            pc = (base + interval) % 12
+            notes.append(floor + (pc - floor) % 12)
+        return notes
+    # rootless
+    intervals = chord.intervals
+    if len(intervals) >= 4:
+        intervals = tuple(i for i in intervals if i != 0)
+    return _stack(base, intervals)
+
+
+def _fit(notes: list[int], range_: tuple[int, int]) -> list[int]:
+    """Step 7: shift the whole voicing by +-12, fold outliers inside, dedupe, sort."""
+    low, high = range_
+
+    def outside(shift: int) -> int:
+        return sum(1 for n in notes if not low <= n + shift <= high)
+
+    shift = min((0, -12, 12), key=outside)  # ties prefer no shift, then down
+    fitted = set()
+    for note in notes:
+        note += shift
+        while note < low:
+            note += 12
+        while note > high:
+            note -= 12
+        fitted.add(note)
+    return sorted(fitted)
+
+
+def _rotations(notes: list[int]) -> list[list[int]]:
+    current = sorted(notes)
+    result = [current]
+    for _ in range(len(current) - 1):
+        current = sorted(current[1:] + [current[0] + 12])
+        result.append(current)
+    return result
+
+
+def voice_chord(
+    chord: Chord,
+    voicing: str,
+    octave: int,
+    range_: tuple[int, int],
+    previous: Optional[list[int]] = None,
+    voice_leading: bool = True,
+    bass_note: bool = False,
+) -> tuple[list[int], Optional[int]]:
+    """Voice a chord as MIDI pitches.
+
+    Returns (sorted upper-structure pitches, bass pitch or None). The upper
+    structure always lies inside range_ (inclusive), with no duplicates. With
+    previous and voice_leading, the inversion/octave closest to previous wins.
+    """
+    if voicing not in VOICINGS:
+        raise TheoryError(
+            f"Invalid voicing {voicing!r}: accepted values are {', '.join(VOICINGS)}"
+        )
+    low, high = range_
+    if high - low < 11:
+        raise TheoryError(
+            f"Invalid range {tuple(range_)!r}: it must span at least 12 semitones "
+            f"(low <= high - 11) so every pitch class fits"
+        )
+    if voicing == "rootless" and tuple(range_) == _DEFAULT_RANGE:
+        range_ = _ROOTLESS_RANGE
+    base = 12 * (octave + 1) + chord.root
+    shaped = _shape_voicing(chord, voicing, base)
+
+    if previous and voice_leading:
+        centre = (range_[0] + range_[1]) / 2
+
+        def cost(candidate: list[int]) -> tuple[int, float]:
+            motion = sum(min(abs(n - p) for p in previous) for n in candidate)
+            return motion, abs(sum(candidate) / len(candidate) - centre)
+
+        candidates = [
+            _fit([n + shift for n in rotation], range_)
+            for rotation in _rotations(shaped)
+            for shift in (-12, 0, 12)
+        ]
+        upper = min(candidates, key=cost)
+    else:
+        upper = _fit(shaped, range_)
+
+    bass: Optional[int] = None
+    if chord.bass is not None or bass_note:
+        pc = chord.bass if chord.bass is not None else chord.root
+        ceiling = upper[0] - 5
+        bass = ceiling - (ceiling - pc) % 12
+    return upper, bass
